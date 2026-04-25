@@ -34,7 +34,6 @@ Backend is **Supabase** (PostgreSQL + Auth + Storage). Client is initialized in 
 
 - **[`entities.js`](src/api/entities.js)** — exports `Location` (Supabase table) and `User` (Supabase Auth + profiles). Entity methods: `.list(orderBy)`, `.filter(query)`, `.get(id)`, `.create(data)`, `.update(id, data)`, `.delete(id)`.
 - **[`integrations.js`](src/api/integrations.js)** — `UploadFile` (Supabase Storage, `media` bucket), `SendEmail` (stub).
-- **[`base44Client.js`](src/api/base44Client.js)** — empty, kept for legacy import compatibility.
 
 ### Auth & Roles
 
