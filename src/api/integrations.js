@@ -1,22 +1,20 @@
-import { base44 } from './base44Client';
+import { supabase } from './supabaseClient';
 
+export async function SendEmail({ to, subject, body }) {
+  console.warn('SendEmail not yet implemented');
+}
 
+export async function UploadFile(file) {
+  const ext = file.name.split('.').pop();
+  const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+  const path = `uploads/${fileName}`;
 
+  const { error } = await supabase.storage
+    .from('media')
+    .upload(path, file, { upsert: false });
 
-export const Core = base44.integrations.Core;
+  if (error) throw error;
 
-export const InvokeLLM = base44.integrations.Core.InvokeLLM;
-
-export const SendEmail = base44.integrations.Core.SendEmail;
-
-export const UploadFile = base44.integrations.Core.UploadFile;
-
-export const GenerateImage = base44.integrations.Core.GenerateImage;
-
-export const ExtractDataFromUploadedFile = base44.integrations.Core.ExtractDataFromUploadedFile;
-
-
-
-
-
-
+  const { data } = supabase.storage.from('media').getPublicUrl(path);
+  return { file_url: data.publicUrl };
+}

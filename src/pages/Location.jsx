@@ -66,9 +66,8 @@ export default function LocationPage() {
         await new Promise(resolve => setTimeout(resolve, retry * 1000));
       }
       
-      const locations = await Location.list();
-      const foundLocation = locations.find(l => l.id === id);
-      
+      const foundLocation = await Location.get(id);
+
       if (foundLocation) {
         setLocation(foundLocation);
         

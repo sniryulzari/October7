@@ -118,7 +118,7 @@ export default function AdminLayout({ children }) {
           navigate(createPageUrl("AccessDenied"));
         }
       } catch (error) {
-        User.loginWithRedirect(`${window.location.origin}${createPageUrl("AdminDashboard")}`);
+        navigate(createPageUrl("Login"));
       } finally {
         setIsLoading(false);
       }

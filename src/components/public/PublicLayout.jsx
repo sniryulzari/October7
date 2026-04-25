@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Route, Map, Search, Home, Mail, Shield, FileText, Settings } from 'lucide-react';
+import { Route, Map, Search, Home, Mail, Shield, FileText, Settings, LogIn } from 'lucide-react';
 import { User } from '@/api/entities';
 
 export default function PublicLayout({ children }) {
@@ -18,39 +18,9 @@ export default function PublicLayout({ children }) {
 
   const checkUserRole = async () => {
     try {
-      const maxRetries = 3;
-      const timeoutMs = 5000; // 5 seconds timeout for each attempt
-      let user = null;
-      let attempt = 0;
-      let lastError = null;
-
-      while (attempt < maxRetries) {
-        attempt++;
-        try {
-          const userPromise = User.me();
-          const timeout = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Request timed out')), timeoutMs)
-          );
-          user = await Promise.race([userPromise, timeout]);
-          break; // Successfully got user, exit retry loop
-        } catch (error) {
-          lastError = error;
-          const errorMessage = error.message === 'Request timed out' ? 'timed out' : error.message;
-          console.warn(`User.me() attempt ${attempt}/${maxRetries} failed: ${errorMessage}.`);
-          
-          if (attempt < maxRetries) {
-            await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Wait before retrying (exponential backoff)
-          } else {
-            // All retries exhausted, re-throw to be caught by the outer catch block
-            throw lastError; 
-          }
-        }
-      }
-
+      const user = await User.me();
       setCurrentUser(user);
-    } catch (error) {
-      // User not authenticated or network error - this is fine for public pages
-      console.log("Could not check user role:", error.message);
+    } catch {
       setCurrentUser(null);
     } finally {
       setIsLoading(false);
@@ -96,18 +66,31 @@ export default function PublicLayout({ children }) {
                 </Button>
               </Link>
               
-              {/* Admin Link - Only visible to admins */}
-              {!isLoading && currentUser && currentUser.role === 'admin' && (
-                <Link to={createPageUrl("AdminDashboard")}>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="text-[#1E3A5F] hover:text-white hover:bg-[#1E3A5F] border border-[#1E3A5F]"
-                  >
-                    <Settings className="w-4 h-4 sm:mr-2" />
-                    <span className="hidden sm:inline">ניהול</span>
-                  </Button>
-                </Link>
+              {/* Admin link or Login button depending on auth state */}
+              {!isLoading && (
+                currentUser?.role === 'admin' ? (
+                  <Link to={createPageUrl("AdminDashboard")}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-[#1E3A5F] hover:text-white hover:bg-[#1E3A5F] border border-[#1E3A5F]"
+                    >
+                      <Settings className="w-4 h-4 sm:mr-2" />
+                      <span className="hidden sm:inline">ניהול</span>
+                    </Button>
+                  </Link>
+                ) : !currentUser ? (
+                  <Link to={createPageUrl("Login")}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-[#555555] hover:text-[#1E3A5F] hover:bg-gray-50"
+                    >
+                      <LogIn className="w-4 h-4 sm:mr-2" />
+                      <span className="hidden sm:inline">כניסה</span>
+                    </Button>
+                  </Link>
+                ) : null
               )}
             </div>
           </div>

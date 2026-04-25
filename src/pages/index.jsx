@@ -24,9 +24,13 @@ import Privacy from "./Privacy";
 
 import Contact from "./Contact";
 
-import Route from "./Route";
+import RoutePage from "./Route";
 
 import AdminStats from "./AdminStats";
+
+import Login from "./Login";
+
+import ResetPassword from "./ResetPassword";
 
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
@@ -56,10 +60,14 @@ const PAGES = {
     
     Contact: Contact,
     
-    Route: Route,
+    Route: RoutePage,
     
     AdminStats: AdminStats,
-    
+
+    Login: Login,
+
+    ResetPassword: ResetPassword,
+
 }
 
 function _getCurrentPage(url) {
@@ -111,10 +119,14 @@ function PagesContent() {
                 
                 <Route path="/Contact" element={<Contact />} />
                 
-                <Route path="/Route" element={<Route />} />
+                <Route path="/Route" element={<RoutePage />} />
                 
                 <Route path="/AdminStats" element={<AdminStats />} />
-                
+
+                <Route path="/Login" element={<Login />} />
+
+                <Route path="/resetpassword" element={<ResetPassword />} />
+
             </Routes>
         </Layout>
     );
