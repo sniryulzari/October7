@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Location } from "@/api/entities";
+import { useLanguage } from "@/utils/language";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,7 @@ import {
 import { createPageUrl } from "@/utils";
 
 export default function LocationPage() {
+  const { t, lang, locName, locStoryTitle, locStoryContent } = useLanguage();
   const [location, setLocation] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -39,10 +41,10 @@ export default function LocationPage() {
   const [playingVideoIndex, setPlayingVideoIndex] = useState(null);
   const [isStoryExpanded, setIsStoryExpanded] = useState(false);
   const [viewCountUpdated, setViewCountUpdated] = useState(false);
-  // New state variables for audio statistics
   const [audioStatsUpdated, setAudioStatsUpdated] = useState(false);
   const [audioPlayStartTime, setAudioPlayStartTime] = useState(null);
   const [totalListeningTime, setTotalListeningTime] = useState(0);
+  const [nextStop, setNextStop] = useState(null);
   const audioRef = useRef(null);
   const videoRefs = useRef([]);
 
@@ -51,6 +53,17 @@ export default function LocationPage() {
     const locationId = urlParams.get('id');
     if (locationId) {
       loadLocation(locationId);
+      try {
+        const saved = localStorage.getItem('savedRoute');
+        if (saved) {
+          const routeData = JSON.parse(saved);
+          const route = routeData.locations || [];
+          const idx = route.findIndex(loc => loc.id === locationId);
+          if (idx >= 0 && idx < route.length - 1) {
+            setNextStop(route[idx + 1]);
+          }
+        }
+      } catch {}
     } else {
       setError("מזהה המקום לא נמצא");
       setIsLoading(false);
@@ -70,13 +83,24 @@ export default function LocationPage() {
 
       if (foundLocation) {
         setLocation(foundLocation);
-        
+
+        try {
+          const visited = JSON.parse(localStorage.getItem('visitedLocations') || '[]');
+          if (!visited.includes(id)) {
+            localStorage.setItem('visitedLocations', JSON.stringify([...visited, id]));
+          }
+        } catch { /* best-effort */ }
+
         if (!viewCountUpdated) {
           try {
-            await Location.update(id, {
-              view_count: (foundLocation.view_count || 0) + 1
-            });
+            await Location.incrementViewCount(id);
             setViewCountUpdated(true);
+
+            // Fire-and-forget analytics — fail silently until Supabase columns exist
+            Location.updateLastViewedAt(id).catch(() => {});
+            Location.incrementLanguageView(id, lang).catch(() => {});
+            const urlSrc = new URLSearchParams(window.location.search).get('src');
+            if (urlSrc === 'qr') Location.incrementField(id, 'qr_views').catch(() => {});
           } catch (error) {
             console.log("Could not update view count:", error);
           }
@@ -106,28 +130,10 @@ export default function LocationPage() {
 
   const updateAudioStats = async () => {
     if (!location || !audioRef.current || audioStatsUpdated) return;
-    
+
     try {
-      const currentAudioPlays = (location.audio_plays || 0) + 1;
       const audioDuration = audioRef.current.duration || 0;
-      
-      // Calculate listening percentage based on current session's listening time
-      let listeningPercentage = 0;
-      if (audioDuration > 0 && totalListeningTime > 0) {
-        listeningPercentage = Math.min(Math.round((totalListeningTime / audioDuration) * 100), 100);
-      }
-      
-      // Calculate new total listening time and average listening percentage
-      const currentTotalListeningTime = (location.total_listening_time || 0) + totalListeningTime;
-      const newAveragePercentage = currentAudioPlays > 0 ? 
-        Math.round((currentTotalListeningTime / (currentAudioPlays * audioDuration)) * 100) : 0;
-      
-      await Location.update(location.id, {
-        audio_plays: currentAudioPlays,
-        total_listening_time: currentTotalListeningTime,
-        average_listening_percentage: Math.min(newAveragePercentage, 100)
-      });
-      
+      await Location.updateAudioStats(location.id, totalListeningTime, audioDuration);
       setAudioStatsUpdated(true);
     } catch (error) {
       console.log("Could not update audio stats:", error);
@@ -144,6 +150,7 @@ export default function LocationPage() {
 
   const shareLocation = async () => {
     const url = window.location.href;
+    if (location) Location.incrementShareCount(location.id).catch(() => {});
     if (navigator.share) {
       try {
         await navigator.share({
@@ -163,7 +170,7 @@ export default function LocationPage() {
   const copyToClipboard = (text) => {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text).then(() => {
-        alert('הקישור הועתק ללוח');
+        alert(t('location.linkCopied'));
       }).catch(() => {
         fallbackCopyTextToClipboard(text);
       });
@@ -179,7 +186,7 @@ export default function LocationPage() {
     textArea.select();
     document.execCommand('copy');
     document.body.removeChild(textArea);
-    alert('הקישור הועתק ללוח');
+    alert(t('location.linkCopied'));
   };
 
   const togglePlay = () => {
@@ -260,6 +267,7 @@ export default function LocationPage() {
         video.pause();
         setPlayingVideoIndex(null);
       } else {
+        if (location) Location.incrementVideoPlays(location.id).catch(() => {});
         // Pause all other videos
         videoRefs.current.forEach((v, i) => {
           if (v && i !== index) {
@@ -275,6 +283,7 @@ export default function LocationPage() {
   const openLightbox = (image, index) => {
     setSelectedImage(image);
     setCurrentGalleryIndex(index);
+    if (location) Location.incrementField(location.id, 'gallery_opens').catch(() => {});
   };
 
   const closeLightbox = () => {
@@ -323,9 +332,22 @@ export default function LocationPage() {
 
   const navigateToLocation = () => {
     if (location && location.coordinates) {
+      Location.incrementNavigationClicks(location.id).catch(() => {});
       const { lat, lng } = location.coordinates;
-      const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`;
-      window.open(googleMapsUrl, '_blank');
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`, '_blank');
+    }
+  };
+
+  const navigateToNext = () => {
+    if (nextStop && nextStop.coordinates) {
+      const { lat, lng } = nextStop.coordinates;
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}&travelmode=driving`, '_blank');
+    }
+  };
+
+  const shareAudio = () => {
+    if (location && location.audio_file) {
+      copyToClipboard(location.audio_file);
     }
   };
 
@@ -343,10 +365,10 @@ export default function LocationPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center" dir="rtl">
+      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-[#1E3A5F]" />
-          <p className="text-[#555555]">טוען את פרטי המקום...</p>
+          <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-[#1D4E8F]" />
+          <p className="text-[#6B7280]">{t('location.loading')}</p>
         </div>
       </div>
     );
@@ -354,26 +376,26 @@ export default function LocationPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center" dir="rtl">
+      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-6">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <X className="w-8 h-8 text-red-500" />
           </div>
-          <h2 className="text-2xl font-bold text-[#222222] mb-2">שגיאה בטעינת המקום</h2>
-          <p className="text-[#555555] mb-6">{error}</p>
+          <h2 className="text-2xl font-bold text-[#1A1A1A] mb-2">{t('location.errorTitle')}</h2>
+          <p className="text-[#6B7280] mb-6">{error}</p>
           <div className="flex gap-3 justify-center">
-            <Button 
+            <Button
               onClick={() => window.location.reload()}
-              className="bg-[#1E3A5F] hover:bg-[#2C5E9E] text-white"
+              className="bg-[#1D4E8F] hover:bg-[#2560B0] text-white"
             >
-              נסה שוב
+              {t('location.tryAgain')}
             </Button>
-            <Button 
+            <Button
               onClick={goBack}
               variant="outline"
-              className="border-[#1E3A5F] text-[#1E3A5F] hover:bg-[#F5F5F5]"
+              className="border-[#1D4E8F] text-[#1D4E8F] hover:bg-[#F2F2F2]"
             >
-              חזור
+              {t('location.back')}
             </Button>
           </div>
         </div>
@@ -383,14 +405,14 @@ export default function LocationPage() {
 
   if (!location) {
     return (
-      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center" dir="rtl">
-        <p className="text-[#555555]">המקום לא נמצא</p>
+      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
+        <p className="text-[#6B7280]">{t('location.notFound')}</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5]" dir="rtl">
+    <div className="min-h-screen bg-[#F2F2F2]">
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
@@ -400,16 +422,16 @@ export default function LocationPage() {
                 onClick={goBack}
                 variant="ghost"
                 size="sm"
-                className="text-[#1E3A5F] hover:bg-[#F5F5F5] p-3 rounded-full"
+                className="text-[#1D4E8F] hover:bg-[#F2F2F2] p-3 rounded-full"
               >
                 <ArrowRight className="w-6 h-6" />
               </Button>
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-[#222222] line-clamp-1">
-                  {location.name}
+                <h1 className="text-xl sm:text-2xl font-bold text-[#1A1A1A] line-clamp-1">
+                  {locName(location)}
                 </h1>
                 {location.category && (
-                  <Badge className="mt-1 bg-[#F5F5F5] text-[#1E3A5F] border-[#1E3A5F]">
+                  <Badge className="mt-1 bg-[#F2F2F2] text-[#1D4E8F] border-[#1D4E8F]">
                     {location.category}
                   </Badge>
                 )}
@@ -420,7 +442,8 @@ export default function LocationPage() {
               onClick={shareLocation}
               variant="ghost"
               size="sm"
-              className="text-[#555555] hover:text-[#1E3A5F] hover:bg-[#F5F5F5] p-3 rounded-full"
+              className="text-[#6B7280] hover:text-[#1D4E8F] hover:bg-[#F2F2F2] p-3 rounded-full"
+              title={t('location.share')}
             >
               <Share2 className="w-5 h-5" />
             </Button>
@@ -428,50 +451,74 @@ export default function LocationPage() {
         </div>
       </div>
 
+      {/* Hero Image — full bleed, before constrained content */}
+      {location.main_image && (
+        <div className="w-full bg-black">
+          <div className="aspect-video sm:aspect-[21/9]">
+            <img
+              src={location.main_image}
+              alt={locName(location)}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-8">
         {/* Audio Player */}
-        {location.audio_file && (
+        {location.audio_file ? (
           <Card className="bg-white border-0 shadow-lg overflow-hidden">
             <CardContent className="p-6 sm:p-8">
               <div className="text-center mb-6">
                 <div className="flex items-center justify-center gap-2 mb-2">
-                  <Headphones className="w-6 h-6 text-[#1E3A5F]" />
-                  <h2 className="text-2xl font-bold text-[#222222]">האזן לסיפור המקום</h2>
+                  <Headphones className="w-6 h-6 text-[#1D4E8F]" />
+                  <h2 className="text-2xl font-bold text-[#1A1A1A]">{t('location.listen')}</h2>
                 </div>
-                <p className="text-[#555555]">לחץ על הכפתור כדי להתחיל האזנה</p>
+                <p className="text-[#6B7280]">{t('location.pressToListen')}</p>
               </div>
 
               <div className="flex flex-col items-center space-y-6">
                 <Button
                   onClick={togglePlay}
-                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#1E3A5F] hover:bg-[#2C5E9E] text-white shadow-lg transition-all duration-200 hover:scale-105"
+                  className="w-24 h-24 rounded-full bg-[#1D4E8F] hover:bg-[#2560B0] text-white shadow-xl transition-all duration-200 hover:scale-105 active:scale-95"
                 >
-                  {isPlaying ? <Pause className="w-8 h-8 sm:w-10 sm:h-10" /> : <Play className="w-8 h-8 sm:w-10 sm:h-10" />}
+                  {isPlaying ? <Pause className="w-12 h-12" /> : <Play className="w-12 h-12" />}
                 </Button>
 
                 <div className="w-full max-w-md space-y-4">
                   <div className="relative">
-                    <div 
-                      className="w-full h-2 bg-[#F5F5F5] rounded-full cursor-pointer"
+                    <div
+                      className="w-full h-3 bg-[#F2F2F2] rounded-full cursor-pointer"
                       onClick={handleSeek}
                     >
-                      <div 
-                        className="h-full bg-[#1E3A5F] rounded-full transition-all duration-100"
+                      <div
+                        className="h-full bg-[#1D4E8F] rounded-full transition-all duration-100"
                         style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
                       />
                     </div>
                   </div>
-                  
-                  <div className="flex justify-between items-center text-sm text-[#555555]">
+
+                  <div className="flex justify-between items-center text-sm text-[#6B7280]">
                     <span>{formatTime(currentTime)}</span>
-                    <Button
-                      onClick={toggleMute}
-                      variant="ghost"
-                      size="sm"
-                      className="text-[#555555] hover:text-[#1E3A5F] p-1"
-                    >
-                      {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        onClick={toggleMute}
+                        variant="ghost"
+                        size="sm"
+                        className="text-[#6B7280] hover:text-[#1D4E8F] p-1"
+                      >
+                        {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                      </Button>
+                      <Button
+                        onClick={shareAudio}
+                        variant="ghost"
+                        size="sm"
+                        className="text-[#6B7280] hover:text-[#1D4E8F] p-1"
+                        title={t('location.shareAudio')}
+                      >
+                        <Share2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                     <span>{formatTime(duration)}</span>
                   </div>
                 </div>
@@ -482,59 +529,59 @@ export default function LocationPage() {
                   onTimeUpdate={handleTimeUpdate}
                   onLoadedMetadata={handleLoadedMetadata}
                   onEnded={handleAudioEnded}
-                  onPause={() => setAudioPlayStartTime(null)} // Update on browser pause
-                  onPlay={() => setAudioPlayStartTime(Date.now())} // Update on browser play
+                  onPause={() => setAudioPlayStartTime(null)}
+                  onPlay={() => setAudioPlayStartTime(Date.now())}
                   className="hidden"
                 />
               </div>
             </CardContent>
           </Card>
-        )}
-
-        {/* Main Image */}
-        {location.main_image && (
-          <Card className="bg-white border-0 shadow-lg overflow-hidden">
-            <div className="aspect-video sm:aspect-[21/9] relative">
-              <img
-                src={location.main_image}
-                alt={location.name}
-                className="w-full h-full object-cover"
-              />
-            </div>
+        ) : (
+          <Card className="bg-white border-0 shadow-sm overflow-hidden opacity-70">
+            <CardContent className="p-6 sm:p-8 text-center">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <Headphones className="w-6 h-6 text-[#6B7280]" />
+                <h2 className="text-xl font-bold text-[#6B7280]">{t('location.recordingPending')}</h2>
+              </div>
+              <p className="text-base text-[#6B7280]">{t('location.recordingPendingDesc')}</p>
+            </CardContent>
           </Card>
         )}
 
         {/* Story Summary */}
-        {location.full_story?.title && (
+        {locStoryTitle(location) && (
           <Card className="bg-white border-0 shadow-lg">
             <CardContent className="p-6 sm:p-8">
-              <h3 className="text-xl sm:text-2xl font-bold text-[#222222] mb-4">
-                {location.full_story.title}
+              <h3 className="text-xl sm:text-2xl font-bold text-[#1A1A1A] mb-4">
+                {locStoryTitle(location)}
               </h3>
-              
-              {location.full_story.content && (
-                <div className="prose prose-lg max-w-none text-[#555555] leading-relaxed">
-                  <div 
-                    dangerouslySetInnerHTML={{ 
-                      __html: getDisplayText(location.full_story.content) 
-                    }} 
+
+              {locStoryContent(location) && (
+                <div className="prose prose-lg max-w-none text-[#1A1A1A] leading-relaxed">
+                  <div
+                    dangerouslySetInnerHTML={{
+                      __html: getDisplayText(locStoryContent(location))
+                    }}
                   />
-                  
-                  {shouldShowReadMore(location.full_story.content) && (
+
+                  {shouldShowReadMore(locStoryContent(location)) && (
                     <Button
-                      onClick={() => setIsStoryExpanded(!isStoryExpanded)}
+                      onClick={() => {
+                        if (!isStoryExpanded) Location.incrementField(location.id, 'story_expansions').catch(() => {});
+                        setIsStoryExpanded(!isStoryExpanded);
+                      }}
                       variant="ghost"
-                      className="mt-4 text-[#1E3A5F] hover:bg-[#F5F5F5] p-0 h-auto font-medium"
+                      className="mt-4 text-[#1D4E8F] hover:bg-[#F2F2F2] p-0 h-auto font-medium"
                     >
                       {isStoryExpanded ? (
                         <>
                           <ChevronUp className="w-4 h-4 ml-1" />
-                          הסתר טקסט
+                          {t('location.readLess')}
                         </>
                       ) : (
                         <>
                           <ChevronDown className="w-4 h-4 ml-1" />
-                          המשך לקרוא
+                          {t('location.readMore')}
                         </>
                       )}
                     </Button>
@@ -550,8 +597,8 @@ export default function LocationPage() {
           <Card className="bg-white border-0 shadow-lg">
             <CardContent className="p-6 sm:p-8">
               <div className="flex items-center gap-2 mb-6">
-                <Camera className="w-5 h-5 text-[#1E3A5F]" />
-                <h3 className="text-xl font-bold text-[#222222]">תמונות מהמקום</h3>
+                <Camera className="w-5 h-5 text-[#1D4E8F]" />
+                <h3 className="text-xl font-bold text-[#1A1A1A]">{t('location.photos')}</h3>
               </div>
 
               <div className="relative">
@@ -573,7 +620,7 @@ export default function LocationPage() {
                           />
                         </div>
                         {image.caption && (
-                          <p className="text-sm text-[#555555] mt-2 text-center">{image.caption}</p>
+                          <p className="text-sm text-[#6B7280] mt-2 text-center">{image.caption}</p>
                         )}
                       </div>
                     ))}
@@ -585,14 +632,14 @@ export default function LocationPage() {
                     <Button
                       onClick={prevCarouselImage}
                       disabled={currentCarouselIndex === 0}
-                      className="absolute left-2 top-1/2 transform -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 text-[#1E3A5F] shadow-lg hover:bg-white disabled:opacity-50"
+                      className="absolute left-2 top-1/2 transform -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 text-[#1D4E8F] shadow-lg hover:bg-white disabled:opacity-50"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </Button>
                     <Button
                       onClick={nextCarouselImage}
                       disabled={currentCarouselIndex === location.gallery.length - 1}
-                      className="absolute right-2 top-1/2 transform -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 text-[#1E3A5F] shadow-lg hover:bg-white disabled:opacity-50"
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 text-[#1D4E8F] shadow-lg hover:bg-white disabled:opacity-50"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </Button>
@@ -606,7 +653,7 @@ export default function LocationPage() {
                         key={index}
                         onClick={() => setCurrentCarouselIndex(index)}
                         className={`w-2 h-2 rounded-full transition-colors ${
-                          index === currentCarouselIndex ? 'bg-[#1E3A5F]' : 'bg-[#F5F5F5]'
+                          index === currentCarouselIndex ? 'bg-[#1D4E8F]' : 'bg-[#F2F2F2]'
                         }`}
                       />
                     ))}
@@ -621,7 +668,7 @@ export default function LocationPage() {
         {location.videos && location.videos.length > 0 && (
           <Card className="bg-white border-0 shadow-lg">
             <CardContent className="p-6 sm:p-8">
-              <h3 className="text-xl font-bold text-[#222222] mb-6">קטעי וידאו</h3>
+              <h3 className="text-xl font-bold text-[#1A1A1A] mb-6">{t('location.videos')}</h3>
 
               <div className="space-y-6">
                 {location.videos.map((video, index) => (
@@ -640,7 +687,7 @@ export default function LocationPage() {
                         <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors cursor-pointer">
                           <Button
                             onClick={() => toggleVideo(index)}
-                            className="w-16 h-16 rounded-full bg-white/90 text-[#1E3A5F] hover:bg-white shadow-lg"
+                            className="w-16 h-16 rounded-full bg-white/90 text-[#1D4E8F] hover:bg-white shadow-lg"
                           >
                             <Play className="w-8 h-8" />
                           </Button>
@@ -651,10 +698,10 @@ export default function LocationPage() {
                     {(video.title || video.description) && (
                       <div className="mt-3">
                         {video.title && (
-                          <h4 className="font-semibold text-[#222222] mb-1">{video.title}</h4>
+                          <h4 className="font-semibold text-[#1A1A1A] mb-1">{video.title}</h4>
                         )}
                         {video.description && (
-                          <p className="text-sm text-[#555555]">{video.description}</p>
+                          <p className="text-base text-[#6B7280]">{video.description}</p>
                         )}
                       </div>
                     )}
@@ -671,14 +718,45 @@ export default function LocationPage() {
             <CardContent className="p-6 sm:p-8 text-center">
               <Button
                 onClick={navigateToLocation}
-                className="w-full sm:w-auto bg-[#1E3A5F] hover:bg-[#2C5E9E] text-white px-8 py-4 text-lg font-medium shadow-lg"
+                className="w-full sm:w-auto bg-[#1D4E8F] hover:bg-[#2560B0] text-white px-8 py-4 text-lg font-medium"
               >
                 <Navigation className="w-6 h-6 mr-3" />
-                נווט למקום
+                {t('location.navigate')}
               </Button>
-              <p className="text-sm text-[#555555] mt-3">
-                יפתח את אפליקציית הניווט במכשיר שלך
+              <p className="text-base text-[#6B7280] mt-3">
+                {t('location.navigationOpens')}
               </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Next Stop Banner */}
+        {nextStop && (
+          <Card className="bg-[#1D4E8F] border-0 shadow-xl">
+            <CardContent className="p-6 sm:p-8">
+              <p className="text-white/70 text-sm mb-1">{t('location.nextStopHeader')}</p>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="text-white/60 text-sm">{t('location.nextStopLabel')}</p>
+                  <p className="text-white text-xl font-bold">{nextStop.name}</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={navigateToNext}
+                    className="flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white border border-white/40 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    {t('location.navigateNext')}
+                  </button>
+                  <a
+                    href={createPageUrl(`Location?id=${nextStop.id}`)}
+                    className="flex items-center gap-1 bg-white text-[#1D4E8F] hover:bg-white/90 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                  >
+                    {t('location.nextStopBtn')}
+                    <ChevronLeft className="w-4 h-4" />
+                  </a>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}

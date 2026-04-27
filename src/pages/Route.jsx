@@ -1,921 +1,822 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Location } from "@/api/entities";
+import { useLanguage } from "@/utils/language";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Route, MapPin, Clock, Play, Navigation, Car, AlertTriangle, Info, X, MapIcon, Loader2 } from "lucide-react";
+import { Route, MapPin, Clock, Navigation, Navigation2, Car, AlertTriangle, Info, X, Loader2, CheckCircle2, Circle, Plus, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 
-// Global cache for route locations
+const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_API_KEY;
+
+const SDEROT = { lat: 31.5244, lng: 34.5951 };
+const GAZA_ENVELOPE = { north: 31.6, south: 31.2, east: 34.7, west: 34.2 };
+
 let routeLocationsCache = null;
 let routeCacheTimestamp = null;
-const ROUTE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const ROUTE_CACHE_DURATION = 5 * 60 * 1000;
 
-// Throttled view count update queue  
-const routeViewCountQueue = new Set();
+// ── Geo helpers ────────────────────────────────────────────────────────────────
+
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function inGazaEnvelope(lat, lng) {
+  return lat >= GAZA_ENVELOPE.south && lat <= GAZA_ENVELOPE.north &&
+         lng >= GAZA_ENVELOPE.west  && lng <= GAZA_ENVELOPE.east;
+}
+
+// ── Route algorithms ───────────────────────────────────────────────────────────
+
+function nearestNeighbor(locations, startPoint) {
+  if (locations.length === 0) return [];
+  const remaining = [...locations];
+  let current = startPoint;
+  const route = [];
+  while (remaining.length > 0) {
+    let bestIdx = 0, bestDist = Infinity;
+    remaining.forEach((loc, i) => {
+      if (!loc.coordinates) return;
+      const d = haversine(current.lat, current.lng, loc.coordinates.lat, loc.coordinates.lng);
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    });
+    const next = remaining[bestIdx];
+    route.push(next);
+    current = next.coordinates;
+    remaining.splice(bestIdx, 1);
+  }
+  return route;
+}
+
+function twoOpt(route) {
+  if (route.length < 4) return route;
+  let best = [...route];
+  let improved = true;
+  while (improved) {
+    improved = false;
+    for (let i = 0; i < best.length - 1; i++) {
+      for (let j = i + 2; j < best.length; j++) {
+        const ci = best[i].coordinates, ci1 = best[i + 1].coordinates;
+        const cj = best[j].coordinates, cj1 = j + 1 < best.length ? best[j + 1].coordinates : null;
+        const before = haversine(ci.lat, ci.lng, ci1.lat, ci1.lng) + (cj1 ? haversine(cj.lat, cj.lng, cj1.lat, cj1.lng) : 0);
+        const after  = haversine(ci.lat, ci.lng, cj.lat, cj.lng)   + (cj1 ? haversine(ci1.lat, ci1.lng, cj1.lat, cj1.lng) : 0);
+        if (after < before - 0.001) {
+          best = [...best.slice(0, i + 1), ...best.slice(i + 1, j + 1).reverse(), ...best.slice(j + 1)];
+          improved = true;
+        }
+      }
+    }
+  }
+  return best;
+}
+
+function buildOptimalRoute(locations, startPoint) {
+  const valid = locations.filter(l => l.coordinates);
+  if (valid.length === 0) return [];
+  return twoOpt(nearestNeighbor(valid, startPoint));
+}
+
+// ── Route mode selection ───────────────────────────────────────────────────────
+//
+// 'custom' mode algorithm:
+//   1. Essential locations always included (the guaranteed base)
+//   2. Remaining budget filled by proximity to the existing route —
+//      the location that adds the least extra travel is picked next,
+//      regardless of its priority tier (recommended vs extended).
+//      A nearby "extended" stop beats a far "recommended" one.
+//   3. 2-opt improvement on the final selection.
+
+function selectLocations(locations, mode, hoursBudget, startPoint) {
+  const essential    = locations.filter(l => (l.priority || 'recommended') === 'essential');
+  const nonEssential = locations.filter(l => (l.priority || 'recommended') !== 'essential');
+  const hasEssential = essential.length > 0;
+
+  if (mode === 'essential') {
+    return buildOptimalRoute(hasEssential ? essential : locations, startPoint);
+  }
+
+  if (mode === 'recommended') {
+    const subset = locations.filter(l => (l.priority || 'recommended') !== 'extended');
+    return buildOptimalRoute(subset.length > 0 ? subset : locations, startPoint);
+  }
+
+  if (mode === 'full') {
+    return buildOptimalRoute(locations, startPoint);
+  }
+
+  if (mode === 'custom') {
+    const budgetMinutes = hoursBudget * 60;
+    const base      = [...essential];
+    let usedTime    = base.reduce((sum, l) => sum + getRecommendedTime(l), 0);
+    const remaining = nonEssential.filter(l => l.coordinates);
+
+    while (remaining.length > 0) {
+      let bestIdx = -1, bestDist = Infinity;
+
+      remaining.forEach((loc, i) => {
+        if (usedTime + getRecommendedTime(loc) > budgetMinutes) return;
+        // Distance to nearest stop already in the route (or start point)
+        const minDist = base.length > 0
+          ? Math.min(...base.map(b => haversine(b.coordinates.lat, b.coordinates.lng, loc.coordinates.lat, loc.coordinates.lng)))
+          : haversine(startPoint.lat, startPoint.lng, loc.coordinates.lat, loc.coordinates.lng);
+        if (minDist < bestDist) { bestDist = minDist; bestIdx = i; }
+      });
+
+      if (bestIdx === -1) break;
+      const next = remaining[bestIdx];
+      base.push(next);
+      usedTime += getRecommendedTime(next);
+      remaining.splice(bestIdx, 1);
+    }
+
+    const fallback = hasEssential ? essential : locations.slice(0, Math.min(3, locations.length));
+    return buildOptimalRoute(base.length > 0 ? base : fallback, startPoint);
+  }
+
+  return buildOptimalRoute(locations, startPoint);
+}
+
+// ── Content helpers ────────────────────────────────────────────────────────────
+
+function getRecommendedTime(location) {
+  let base = location.category === 'אירוע'
+    ? (location.name?.match(/נובה|Nova|פסטיבל/) ? 90 : 60)
+    : 30;
+  if (location.videos?.length)          base += Math.min(location.videos.length * 8, 25);
+  if (location.gallery?.length > 3)     base += Math.min((location.gallery.length - 3) * 2, 15);
+  if (location.audio_file)              base += 15;
+  if (location.full_story?.content?.length > 500) base += 10;
+  return Math.max(20, Math.min(base, 120));
+}
+
+function makePopupHTML(location, index, recommendedTime) {
+  const navUrl    = `https://www.google.com/maps/dir/?api=1&destination=${location.coordinates.lat},${location.coordinates.lng}&travelmode=driving`;
+  const detailUrl = createPageUrl(`Location?id=${location.id}`);
+  return `
+    <div dir="rtl" style="font-family:Arial,sans-serif;max-width:280px;min-width:220px;">
+      ${location.main_image ? `
+        <div style="margin:-8px -8px 10px;overflow:hidden;height:130px;border-radius:8px 8px 0 0;">
+          <img src="${location.main_image}" style="width:100%;height:130px;object-fit:cover;" />
+        </div>` : ''}
+      <div style="font-size:12px;color:#888;margin-bottom:4px;">תחנה ${index + 1}</div>
+      <h3 style="margin:0 0 6px;font-size:16px;font-weight:700;color:#1A1A1A;">${location.name}</h3>
+      <p style="margin:0 0 8px;font-size:13px;color:#5C5750;line-height:1.4;">
+        ${location.full_story?.title || 'מקום זיכרון מאירועי 7 באוקטובר 2023'}
+      </p>
+      <div style="font-size:12px;color:#1D4E8F;margin-bottom:10px;">⏱ זמן מומלץ: ${recommendedTime} דקות</div>
+      <div style="display:flex;gap:8px;">
+        <a href="${detailUrl}"
+           style="flex:1;background:#1D4E8F;color:white;padding:8px;text-decoration:none;border-radius:6px;font-size:13px;text-align:center;display:block;">
+          פרטים מלאים
+        </a>
+        <a href="${navUrl}" target="_blank" rel="noopener"
+           style="background:#f0f4ff;color:#1D4E8F;padding:8px 12px;text-decoration:none;border-radius:6px;font-size:13px;text-align:center;display:block;border:1px solid #c5d5f0;">
+          🧭 נווט
+        </a>
+      </div>
+    </div>`;
+}
+
+// ── Component ──────────────────────────────────────────────────────────────────
 
 export default function RoutePage() {
-  const [allLocations, setAllLocations] = useState([]);
-  const [routeLocations, setRouteLocations] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [map, setMap] = useState(null);
-  const [userLocation, setUserLocation] = useState(null);
-  const [locationPermission, setLocationPermission] = useState('prompt');
-  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const { t, locName, locStoryTitle } = useLanguage();
 
+  const [allLocations, setAllLocations]     = useState([]);
+  const [routeLocations, setRouteLocations] = useState([]);
+  const [isLoading, setIsLoading]           = useState(true);
+
+  // 'sderot' | 'granted' | 'loading'
+  const [locationPermission, setLocationPermission] = useState('sderot');
+  const [userLocation, setUserLocation]             = useState(SDEROT);
+
+  // Route mode
+  const [routeMode, setRouteMode]     = useState('recommended');
+  const [hoursBudget, setHoursBudget] = useState(6);
+
+  // UI
+  const [visitedLocations, setVisitedLocations] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('visitedLocations') || '[]'); } catch { return []; }
+  });
+  const [showNotInRoute, setShowNotInRoute] = useState(false);
+
+  // Map
+  const mapDivRef  = useRef(null);
+  const mapRef     = useRef(null);
+  const popupRef   = useRef(null);
+  const markersRef = useRef({});
+  const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [mapReady, setMapReady]         = useState(false);
+
+  // ── Load MapLibre ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (window.maplibregl) { setScriptLoaded(true); return; }
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
+    document.head.appendChild(link);
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
+    s.onload = () => {
+      window.maplibregl.setRTLTextPlugin(
+        'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js', null, true
+      );
+      setScriptLoaded(true);
+    };
+    document.head.appendChild(s);
+  }, []);
+
+  // ── Initialize map ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!scriptLoaded || !mapDivRef.current || mapRef.current) return;
+    const map = new window.maplibregl.Map({
+      container: mapDivRef.current,
+      style: MAPTILER_KEY
+        ? `https://api.maptiler.com/maps/streets-v2/style.json?key=${MAPTILER_KEY}`
+        : 'https://demotiles.maplibre.org/style.json',
+      center: [SDEROT.lng, SDEROT.lat],
+      zoom: 10,
+    });
+    map.addControl(new window.maplibregl.NavigationControl({ showCompass: false }), 'top-left');
+    map.addControl(new window.maplibregl.FullscreenControl(), 'top-right');
+    map.addControl(new window.maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
+    popupRef.current = new window.maplibregl.Popup({ offset: 25, maxWidth: '300px', className: 'map-popup-rtl' });
+    mapRef.current = map;
+    map.on('load', () => {
+      if (MAPTILER_KEY) {
+        map.getStyle().layers.forEach(layer => {
+          if (layer.type === 'symbol') {
+            try { map.setLayoutProperty(layer.id, 'text-field', ['coalesce', ['get', 'name:he'], ['get', 'name']]); }
+            catch { /* some layers don't support text-field */ }
+          }
+        });
+      }
+      setMapReady(true);
+    });
+    return () => { map.remove(); mapRef.current = null; };
+  }, [scriptLoaded]);
+
+  // ── Data loading ─────────────────────────────────────────────────────────────
   useEffect(() => {
     loadAllLocations();
     loadSavedRoute();
-    initializeWithSderotAsDefault();
   }, []);
 
   useEffect(() => {
-    if (!map && typeof window !== 'undefined' && !isLoading) {
-      initRouteMap();
+    if (allLocations.length > 0 && routeLocations.length === 0) {
+      const route = selectLocations(allLocations, routeMode, hoursBudget, userLocation);
+      setRouteLocations(route);
+      saveRoute(route, userLocation, locationPermission, routeMode, hoursBudget);
     }
-  }, [isLoading]);
+  }, [allLocations]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Map update ───────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (map && routeLocations.length > 0) {
-      addRouteToMap(map, routeLocations);
-    } else if (map && allLocations.length > 0 && routeLocations.length === 0) {
-      showDefaultMap();
-    }
-  }, [map, routeLocations, allLocations, userLocation, locationPermission]);
+    if (mapReady && routeLocations.length > 0) updateRouteMap();
+  }, [mapReady, routeLocations, visitedLocations, userLocation, locationPermission]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    if (userLocation && allLocations.length > 0 && routeLocations.length === 0) {
-      generateOptimalRoute();
-    }
-  }, [userLocation, allLocations]);
-
-  // Initialize with Sderot as default location for route planning
-  const initializeWithSderotAsDefault = () => {
-    const sderotLocation = { lat: 31.5244, lng: 34.5951 }; // Sderot coordinates
-    setUserLocation(sderotLocation);
-    setLocationPermission('denied'); // Default to denied until user explicitly shares location
-  };
-
-  // Save route to localStorage
-  const saveRoute = (route, userLoc, permission) => {
-    const routeData = {
-      locations: route,
-      userLocation: userLoc,
-      permission: permission,
-      timestamp: Date.now()
-    };
-    localStorage.setItem('savedRoute', JSON.stringify(routeData));
-  };
-
-  // Load saved route from localStorage
-  const loadSavedRoute = () => {
-    try {
-      const saved = localStorage.getItem('savedRoute');
-      if (saved) {
-        const routeData = JSON.parse(saved);
-        // Check if saved route is not too old (24 hours)
-        if (Date.now() - routeData.timestamp < 24 * 60 * 60 * 1000) {
-          setRouteLocations(routeData.locations || []);
-          if (routeData.userLocation) {
-            setUserLocation(routeData.userLocation);
-          }
-          setLocationPermission(routeData.permission || 'denied');
-        } else {
-          localStorage.removeItem('savedRoute');
-        }
-      }
-    } catch (error) {
-      console.log("Could not load saved route:", error);
-    }
-  };
+  // ── Helpers ──────────────────────────────────────────────────────────────────
 
   const loadAllLocations = async () => {
     setIsLoading(true);
     try {
-      // Check cache first
-      if (routeLocationsCache && routeCacheTimestamp && (Date.now() - routeCacheTimestamp < ROUTE_CACHE_DURATION)) {
-        const activeLocations = routeLocationsCache.filter(loc => loc.is_active !== false && loc.coordinates);
-        setAllLocations(activeLocations);
+      if (routeLocationsCache && routeCacheTimestamp && Date.now() - routeCacheTimestamp < ROUTE_CACHE_DURATION) {
+        setAllLocations(routeLocationsCache.filter(l => l.is_active !== false && l.coordinates));
         setIsLoading(false);
         return;
       }
-
-      // Add delay to prevent rate limiting
-      await new Promise(resolve => setTimeout(resolve, 400));
-      
-      const locations = await Location.list("-created_date");
-      const activeLocations = locations.filter(loc => loc.is_active !== false && loc.coordinates);
-      
-      // Update cache
-      routeLocationsCache = locations;
+      await new Promise(r => setTimeout(r, 400));
+      const data = await Location.list("-created_date");
+      routeLocationsCache = data;
       routeCacheTimestamp = Date.now();
-      
-      setAllLocations(activeLocations);
-    } catch (error) {
-      console.error("Error loading locations:", error);
-      // Don't retry immediately to avoid rate limiting
-      if (error.response?.status === 429) {
-        setTimeout(() => {
-          if (allLocations.length === 0) { // Only retry if locations haven't been loaded yet
-            loadAllLocations();
-          }
-        }, 5000); // Wait 5 seconds before retry
-      } else {
-        // For other errors, still try to retry after a delay, but not too aggressively
-        setTimeout(() => {
-            if (allLocations.length === 0) {
-                loadAllLocations();
-            }
-        }, 2000);
-      }
+      setAllLocations(data.filter(l => l.is_active !== false && l.coordinates));
+    } catch (err) {
+      console.error("Error loading locations:", err);
     }
     setIsLoading(false);
   };
 
-  const getUserLocation = () => {
-    setIsLoadingLocation(true);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const newLocation = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude
-          };
-          setUserLocation(newLocation);
-          setLocationPermission('granted');
-          setIsLoadingLocation(false);
-          
-          // Generate route immediately after getting user location
-          if (allLocations.length > 0) {
-            const optimizedRoute = generateOptimalRouteForLocation(newLocation, 'granted');
-            setRouteLocations(optimizedRoute);
-            saveRoute(optimizedRoute, newLocation, 'granted');
-          }
-        },
-        (error) => {
-          console.log("Location access denied or failed:", error.message);
-          setLocationPermission('denied');
-          setIsLoadingLocation(false);
-          
-          // Keep Sderot as default location
-          const sderotLocation = { lat: 31.5244, lng: 34.5951 }; // Sderot coordinates
-          setUserLocation(sderotLocation);
-          
-          // Generate route from Sderot
-          if (allLocations.length > 0) {
-            const optimizedRoute = createLogicalRoute(allLocations, sderotLocation);
-            setRouteLocations(optimizedRoute);
-            saveRoute(optimizedRoute, sderotLocation, 'denied');
-          }
-        }
-      );
-    } else {
-      setLocationPermission('denied');
-      setIsLoadingLocation(false);
-      // Keep Sderot as default
-      const sderotLocation = { lat: 31.5244, lng: 34.5951 };
-      setUserLocation(sderotLocation);
-      
-      if (allLocations.length > 0) {
-        const optimizedRoute = createLogicalRoute(allLocations, sderotLocation);
-        setRouteLocations(optimizedRoute);
-        saveRoute(optimizedRoute, sderotLocation, 'denied');
-      }
-    }
+  const loadSavedRoute = () => {
+    try {
+      const raw = localStorage.getItem('savedRoute');
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (Date.now() - data.timestamp > 24 * 60 * 60 * 1000) { localStorage.removeItem('savedRoute'); return; }
+      if (data.locations?.length) setRouteLocations(data.locations);
+      if (data.userLocation)      setUserLocation(data.userLocation);
+      if (data.permission)        setLocationPermission(data.permission);
+      if (data.routeMode)         setRouteMode(data.routeMode);
+      if (data.hoursBudget)       setHoursBudget(data.hoursBudget);
+    } catch { /* corrupt localStorage */ }
   };
 
-  const requestLocationPermission = () => {
-    getUserLocation();
+  const saveRoute = (route, userLoc, permission, mode, budget) => {
+    localStorage.setItem('savedRoute', JSON.stringify({
+      locations: route, userLocation: userLoc, permission,
+      routeMode: mode, hoursBudget: budget, timestamp: Date.now(),
+    }));
   };
 
-  // Calculate distance between two points using Haversine formula
-  const calculateDistance = (lat1, lng1, lat2, lng2) => {
-    const R = 6371; // Earth's radius in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  };
-
-  // Check if user is in Gaza envelope area
-  const isInGazaEnvelope = (userLat, userLng) => {
-    const gazaEnvelopeBounds = {
-      north: 31.6,
-      south: 31.2,
-      east: 34.7,
-      west: 34.2
-    };
-    
-    return userLat >= gazaEnvelopeBounds.south &&
-           userLat <= gazaEnvelopeBounds.north &&
-           userLng >= gazaEnvelopeBounds.west &&
-           userLng <= gazaEnvelopeBounds.east;
-  };
-
-  const generateOptimalRouteForLocation = (location, permissionStatus) => {
-    if (!location || allLocations.length === 0) return [];
-
-    const userInGaza = isInGazaEnvelope(location.lat, location.lng);
-
-    if (userInGaza && permissionStatus === 'granted') {
-      // User is in Gaza envelope and gave permission - sort by proximity only
-      return [...allLocations].sort((a, b) => {
-        const distanceA = calculateDistance(location.lat, location.lng, a.coordinates.lat, a.coordinates.lng);
-        const distanceB = calculateDistance(location.lat, location.lng, b.coordinates.lat, b.coordinates.lng);
-        return distanceA - distanceB;
-      });
-    } else {
-      // User is outside Gaza envelope OR denied location - create logical route
-      return createLogicalRoute(allLocations, location);
-    }
-  };
-
-  const generateOptimalRoute = () => {
-    if (!userLocation || allLocations.length === 0) return;
-
-    const optimizedRoute = generateOptimalRouteForLocation(userLocation, locationPermission);
-    setRouteLocations(optimizedRoute);
-    saveRoute(optimizedRoute, userLocation, locationPermission);
-  };
-
-  const createLogicalRoute = (locations, startPoint) => {
-    if (locations.length === 0) return [];
-
-    // First, try to find "תחנת המשטרה בשדרות" as the starting point
-    let startLocation = locations.find(loc => 
-      loc.name && loc.name.includes("תחנת המשטרה") && loc.name.includes("שדרות")
+  const requestLocation = () => {
+    if (!navigator.geolocation) return;
+    setLocationPermission('loading');
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserLocation(loc);
+        setLocationPermission('granted');
+        const route = selectLocations(allLocations, routeMode, hoursBudget, loc);
+        setRouteLocations(route);
+        saveRoute(route, loc, 'granted', routeMode, hoursBudget);
+      },
+      () => { setLocationPermission('sderot'); setUserLocation(SDEROT); }
     );
-
-    // If not found, try variations
-    if (!startLocation) {
-      startLocation = locations.find(loc => 
-        loc.name && (loc.name.includes("תחנת משטרה") || 
-        (loc.name.includes("שדרות") && loc.name.includes("משטרה")))
-      );
-    }
-
-    // If still not found, find the northernmost location
-    if (!startLocation && locations.length > 0) {
-      startLocation = locations.reduce((northernmost, current) => {
-        if (!northernmost.coordinates && current.coordinates) return current;
-        if (!current.coordinates && northernmost.coordinates) return northernmost;
-        if (!northernmost.coordinates && !current.coordinates) return northernmost;
-        
-        return current.coordinates.lat > northernmost.coordinates.lat ? current : northernmost;
-      }, locations[0]);
-    }
-
-    // If we still don't have a start location, fall back to closest to start point
-    if (!startLocation && locations.length > 0) {
-      let closestDistance = Infinity;
-      locations.forEach(location => {
-        if (!location.coordinates) return;
-        const distance = calculateDistance(
-          startPoint.lat, 
-          startPoint.lng,
-          location.coordinates.lat,
-          location.coordinates.lng
-        );
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          startLocation = location;
-        }
-      });
-    }
-
-    if (!startLocation) return [];
-
-    const route = [startLocation];
-    const remainingLocations = locations.filter(loc => loc.id !== startLocation.id);
-    
-    // Continue building route from the start location
-    let currentPoint = startLocation.coordinates;
-    
-    while (remainingLocations.length > 0) {
-      let nextClosest = null;
-      let nextDistance = Infinity;
-
-      // Find the closest remaining location to current point
-      remainingLocations.forEach(location => {
-        if (!location.coordinates) return;
-        const distance = calculateDistance(
-          currentPoint.lat,
-          currentPoint.lng,
-          location.coordinates.lat,
-          location.coordinates.lng
-        );
-        
-        if (distance < nextDistance) {
-          nextDistance = distance;
-          nextClosest = location;
-        }
-      });
-
-      if (nextClosest) {
-        route.push(nextClosest);
-        currentPoint = nextClosest.coordinates;
-        const index = remainingLocations.findIndex(loc => loc.id === nextClosest.id);
-        remainingLocations.splice(index, 1);
-      } else {
-        break;
-      }
-    }
-
-    return route;
   };
 
-  // Function to get recommended time per location based on category and content
-  const getRecommendedTime = (location) => {
-    // Base time by category - more specific and dynamic
-    let baseTime = 30; // Default 30 minutes
-    
-    // Enhanced category-based timing
-    switch (location.category) {
-      case 'יישוב':
-        baseTime = 30; // Villages - moderate time
-        break;
-      case 'בסיס צבאי':
-        baseTime = 45; // Military bases - more time
-        break;
-      case 'אירוע':
-        // Special case for Nova Festival and other events
-        if (location.name && (location.name.includes('נובה') || location.name.includes('Nova') || location.name.includes('פסטיבל'))) {
-          baseTime = 90; // Nova festival - much longer visit
-        } else {
-          baseTime = 60; // Other events - longer visits
-        }
-        break;
-      default:
-        baseTime = 30;
-    }
-    
-    // Add time based on content richness
-    if (location.videos && location.videos.length > 0) {
-      baseTime += Math.min(location.videos.length * 8, 25); // 8 minutes per video, max 25 minutes
-    }
-    
-    if (location.gallery && location.gallery.length > 3) {
-      baseTime += Math.min((location.gallery.length - 3) * 2, 15); // 2 minutes per additional photo, max 15 minutes
-    }
-    
-    if (location.audio_file) {
-      baseTime += 15; // Extra time for audio content
-    }
-    
-    // Bonus time for locations with rich full_story content
-    if (location.full_story && location.full_story.content && location.full_story.content.length > 500) {
-      baseTime += 10; // Extra time for detailed stories
-    }
-    
-    // Special locations get more time
-    const specialKeywords = ['מטכ"ל', 'מפקדה', 'מרכז', 'עיקרי'];
-    if (location.name && specialKeywords.some(keyword => location.name.includes(keyword))) {
-      baseTime += 15;
-    }
-    
-    // Cap at reasonable limits
-    return Math.max(20, Math.min(baseTime, 120)); // Minimum 20 minutes, maximum 2 hours
+  const applyMode = (mode, budget = hoursBudget) => {
+    setRouteMode(mode);
+    if (mode === 'custom') setHoursBudget(budget);
+    const route = selectLocations(allLocations, mode, budget, userLocation);
+    setRouteLocations(route);
+    saveRoute(route, userLocation, locationPermission, mode, budget);
   };
 
   const removeFromRoute = (locationId) => {
-    const updatedRoute = routeLocations.filter(loc => loc.id !== locationId);
-    setRouteLocations(updatedRoute);
-    saveRoute(updatedRoute, userLocation, locationPermission);
+    const updated = routeLocations.filter(l => l.id !== locationId);
+    setRouteLocations(updated);
+    saveRoute(updated, userLocation, locationPermission, routeMode, hoursBudget);
   };
 
-  const initRouteMap = () => {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
-
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.onload = () => {
-      // Center on Sderot by default
-      const mapInstance = window.L.map('route-map').setView([31.5244, 34.5951], 11);
-      
-      window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-      }).addTo(mapInstance);
-
-      setMap(mapInstance);
-    };
-    document.head.appendChild(script);
+  const addToRoute = (location) => {
+    const updated = twoOpt([...routeLocations, location]);
+    setRouteLocations(updated);
+    saveRoute(updated, userLocation, locationPermission, routeMode, hoursBudget);
   };
 
-  const showDefaultMap = () => {
-    if (!map || allLocations.length === 0) return;
-
-    // Clear existing layers (route lines, numbered markers, user marker)
-    map.eachLayer(layer => {
-      if (layer instanceof window.L.Marker || layer instanceof window.L.Polyline) {
-        map.removeLayer(layer);
-      }
-    });
-
-    // Add all locations as markers
-    allLocations.forEach((location) => {
-      const marker = window.L.marker([location.coordinates.lat, location.coordinates.lng], {
-        icon: window.L.divIcon({
-          className: 'default-marker',
-          html: `<div style="background-color: #666; color: white; width: 25px; height: 25px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">?</div>`,
-          iconSize: [25, 25],
-          iconAnchor: [12, 12]
-        })
-      })
-      .addTo(map)
-      .bindPopup(`
-        <div style="text-align: right; direction: rtl; min-width: 200px;">
-          <h3 style="margin: 0 0 8px 0; font-weight: bold; color: #222222;">${location.name}</h3>
-          ${location.main_image ? `<img src="${location.main_image}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; margin-bottom: 8px;" />` : ''}
-          <p style="margin: 0 0 10px 0; font-size: 13px; color: #555555;">${location.full_story?.title || 'מקום זיכרון משמעותי'}</p>
-          <a href="${createPageUrl(`Location?id=${location.id}`)}" 
-             style="background: #1E3A5F; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; display: inline-block; font-size: 12px;">
-            למידע נוסף
-          </a>
-        </div>
-      `);
-    });
-
-    // Fit map to show all locations
-    if (allLocations.length > 0) {
-      const group = new window.L.featureGroup(
-        allLocations.map(loc => window.L.marker([loc.coordinates.lat, loc.coordinates.lng]))
-      );
-      map.fitBounds(group.getBounds().pad(0.1));
-    }
+  const resetRoute = () => {
+    const route = selectLocations(allLocations, routeMode, hoursBudget, userLocation);
+    setRouteLocations(route);
+    saveRoute(route, userLocation, locationPermission, routeMode, hoursBudget);
   };
 
-  const addRouteToMap = (mapInstance, locations) => {
-    if (!mapInstance || locations.length === 0) return;
-
-    // Clear existing layers
-    mapInstance.eachLayer(layer => {
-      if (layer instanceof window.L.Marker || layer instanceof window.L.Polyline) {
-        mapInstance.removeLayer(layer);
-      }
+  const toggleVisited = (locationId) => {
+    setVisitedLocations(prev => {
+      const next = prev.includes(locationId) ? prev.filter(id => id !== locationId) : [...prev, locationId];
+      localStorage.setItem('visitedLocations', JSON.stringify(next));
+      return next;
     });
-
-    // Add user location marker if available and permission granted
-    if (userLocation && locationPermission === 'granted') {
-      window.L.marker([userLocation.lat, userLocation.lng], {
-        icon: window.L.divIcon({
-          className: 'user-marker',
-          html: `<div style="background-color: #4CAF50; color: white; width: 30px; height: 30px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 12px;">אני</div>`,
-          iconSize: [30, 30],
-          iconAnchor: [15, 15]
-        })
-      }).addTo(mapInstance).bindPopup('המיקום שלך');
-    } else if (userLocation && locationPermission === 'denied') {
-      // Show Sderot as starting point when location is denied
-      window.L.marker([userLocation.lat, userLocation.lng], {
-        icon: window.L.divIcon({
-          className: 'start-marker',
-          html: `<div style="background-color: #FF9800; color: white; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 10px;">התחלה</div>`,
-          iconSize: [32, 32],
-          iconAnchor: [16, 16]
-        })
-      }).addTo(mapInstance).bindPopup('נקודת התחלה: שדרות');
-    }
-
-    // Create route line
-    const routeCoordinates = locations.map(loc => [loc.coordinates.lat, loc.coordinates.lng]);
-    
-    if (userLocation && locationPermission === 'granted') { // Only add user location to route line if permission granted
-      routeCoordinates.unshift([userLocation.lat, userLocation.lng]);
-    } else if (userLocation && locationPermission === 'denied') { // Add Sderot if permission denied
-      routeCoordinates.unshift([userLocation.lat, userLocation.lng]);
-    }
-    
-    const routeLine = window.L.polyline(routeCoordinates, {
-      color: '#1E3A5F',
-      weight: 4,
-      opacity: 0.8
-    }).addTo(mapInstance);
-
-    // Add numbered markers for locations
-    locations.forEach((location, index) => {
-      const marker = window.L.marker([location.coordinates.lat, location.coordinates.lng], {
-        icon: window.L.divIcon({
-          className: 'route-marker',
-          html: `<div style="background-color: #1E3A5F; color: white; width: 30px; height: 30px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px;">${index + 1}</div>`,
-          iconSize: [30, 30],
-          iconAnchor: [15, 15]
-        })
-      })
-      .addTo(mapInstance)
-      .bindPopup(`
-        <div style="text-align: right; direction: rtl; min-width: 200px;">
-          <h3 style="margin: 0 0 8px 0; font-weight: bold; color: #222222;">תחנה ${index + 1}: ${location.name}</h3>
-          ${location.main_image ? `<img src="${location.main_image}" style="width: 100%; height: 100px; object-fit: cover; border-radius: 6px; margin-bottom: 8px;" />` : ''}
-          <p style="margin: 0 0 10px 0; font-size: 13px; color: #555555;">${location.full_story?.title || 'מקום זיכרון משמעותי'}</p>
-          <a href="${createPageUrl(`Location?id=${location.id}`)}" 
-             style="background: #1E3A5F; color: white; padding: 6px 12px; text-decoration: none; border-radius: 4px; display: inline-block; font-size: 12px;">
-            למידע נוסף
-          </a>
-        </div>
-      `);
-    });
-
-    // Fit map to show entire route
-    if (routeLine) {
-      mapInstance.fitBounds(routeLine.getBounds().pad(0.1));
-    }
   };
 
-  const scrollToMap = () => {
-    document.getElementById('route-map-section')?.scrollIntoView({ 
-      behavior: 'smooth' 
-    });
+  const incrementViewCount = async (locationId) => {
+    try { await Location.incrementViewCount(locationId); } catch { /* best-effort */ }
   };
 
   const startNavigation = () => {
-    if (routeLocations.length > 0 && routeLocations[0].coordinates) {
-      const firstLocation = routeLocations[0];
-      const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${firstLocation.coordinates.lat},${firstLocation.coordinates.lng}&travelmode=driving`;
-      window.open(googleMapsUrl, '_blank');
+    const stops = routeLocations.filter(l => l.coordinates);
+    if (stops.length === 0) return;
+    const origin      = locationPermission === 'granted'
+      ? `${userLocation.lat},${userLocation.lng}` : `${SDEROT.lat},${SDEROT.lng}`;
+    const destination = stops[stops.length - 1];
+    const waypoints   = stops.slice(0, -1).slice(0, 8).map(l => `${l.coordinates.lat},${l.coordinates.lng}`).join('|');
+    window.open(
+      `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination.coordinates.lat},${destination.coordinates.lng}${waypoints ? `&waypoints=${waypoints}` : ''}&travelmode=driving`,
+      '_blank'
+    );
+  };
+
+  // ── Map rendering ─────────────────────────────────────────────────────────────
+
+  const updateRouteMap = () => {
+    const map = mapRef.current;
+    if (!map || !mapReady || !window.maplibregl) return;
+
+    Object.values(markersRef.current).forEach(m => m.remove());
+    markersRef.current = {};
+    popupRef.current?.remove();
+
+    const coords = [[userLocation.lng, userLocation.lat]];
+    routeLocations.forEach(l => { if (l.coordinates) coords.push([l.coordinates.lng, l.coordinates.lat]); });
+    const lineData = { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } };
+    if (map.getSource('route-line')) map.getSource('route-line').setData(lineData);
+    else {
+      map.addSource('route-line', { type: 'geojson', data: lineData });
+      map.addLayer({ id: 'route-line-layer', type: 'line', source: 'route-line',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': '#1D4E8F', 'line-width': 4, 'line-opacity': 0.8 },
+      });
+    }
+
+    const startEl = document.createElement('div');
+    if (locationPermission === 'granted') {
+      startEl.style.cssText = 'width:20px;height:20px;border-radius:50%;background:#22C55E;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);';
+    } else {
+      startEl.style.cssText = 'width:36px;height:36px;border-radius:50%;background:#FF9800;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:10px;font-family:Arial,sans-serif;';
+      startEl.textContent = 'התחלה';
+    }
+    markersRef.current['__start__'] = new window.maplibregl.Marker({ element: startEl })
+      .setLngLat([userLocation.lng, userLocation.lat])
+      .setPopup(new window.maplibregl.Popup({ offset: 15 }).setHTML(
+        `<div dir="rtl">${locationPermission === 'granted' ? 'המיקום שלי' : 'נקודת התחלה: שדרות'}</div>`
+      ))
+      .addTo(map);
+
+    routeLocations.forEach((location, index) => {
+      if (!location.coordinates) return;
+      const isVisited = visitedLocations.includes(location.id);
+      const el = document.createElement('div');
+      el.style.cssText = 'cursor:pointer;';
+      el.innerHTML = `<div style="background:${isVisited ? '#22C55E' : '#1D4E8F'};color:white;width:32px;height:32px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;font-family:Arial,sans-serif;">${index + 1}</div>`;
+      el.addEventListener('click', () => {
+        popupRef.current
+          .setLngLat([location.coordinates.lng, location.coordinates.lat])
+          .setHTML(makePopupHTML(location, index, getRecommendedTime(location)))
+          .addTo(map);
+      });
+      markersRef.current[location.id] = new window.maplibregl.Marker({ element: el })
+        .setLngLat([location.coordinates.lng, location.coordinates.lat])
+        .addTo(map);
+    });
+
+    const locs = routeLocations.filter(l => l.coordinates);
+    if (locs.length > 0) {
+      const bounds = new window.maplibregl.LngLatBounds();
+      bounds.extend([userLocation.lng, userLocation.lat]);
+      locs.forEach(l => bounds.extend([l.coordinates.lng, l.coordinates.lat]));
+      map.fitBounds(bounds, { padding: 50, maxZoom: 14 });
     }
   };
 
-  // Throttled view count update
-  const incrementViewCount = async (locationId) => {
-    if (routeViewCountQueue.has(locationId)) return;
-    
-    try {
-      routeViewCountQueue.add(locationId);
-      const lastUpdate = localStorage.getItem(`routeViewUpdate_${locationId}`);
-      const now = Date.now();
-      
-      if (!lastUpdate || now - parseInt(lastUpdate, 10) > 60000) { // Update only if no previous update or if more than 1 minute has passed
-        const location = allLocations.find(l => l.id === locationId);
-        if (location) {
-          await Location.update(locationId, {
-            view_count: (location.view_count || 0) + 1
-          });
-          localStorage.setItem(`routeViewUpdate_${locationId}`, now.toString());
-        }
-      }
-    } catch (error) {
-      console.error("Error updating view count:", error);
-    } finally {
-      routeViewCountQueue.delete(locationId);
-    }
-  };
+  // ── Derived values ────────────────────────────────────────────────────────────
 
-  // Calculate totals with dynamic time
-  const totalDuration = routeLocations.reduce((total, location) => {
-    return total + getRecommendedTime(location);
+  const totalDuration = routeLocations.reduce((sum, l) => sum + getRecommendedTime(l), 0);
+  const totalDistance = routeLocations.reduce((sum, l, i) => {
+    if (!l.coordinates) return sum;
+    const prev = i === 0 ? userLocation : routeLocations[i - 1]?.coordinates;
+    return prev ? sum + haversine(prev.lat, prev.lng, l.coordinates.lat, l.coordinates.lng) : sum;
   }, 0);
-  
-  const totalDistance = userLocation && routeLocations.length > 0 ? 
-    routeLocations.reduce((total, location, index) => {
-      if (index === 0 && userLocation) {
-        return total + calculateDistance(userLocation.lat, userLocation.lng, location.coordinates.lat, location.coordinates.lng);
-      } else if (index > 0) {
-        return total + calculateDistance(
-          routeLocations[index - 1].coordinates.lat,
-          routeLocations[index - 1].coordinates.lng,
-          location.coordinates.lat,
-          location.coordinates.lng
-        );
-      }
-      return total;
-    }, 0) : 0;
+  const visitedCount  = routeLocations.filter(l => visitedLocations.includes(l.id)).length;
+  const notInRoute    = allLocations.filter(l => !routeLocations.find(r => r.id === l.id));
+
+  // ── Loading ───────────────────────────────────────────────────────────────────
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-[#1E3A5F]" />
-          <p className="text-[#555555]">טוען מקומות...</p>
+          <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-[#1D4E8F]" />
+          <p className="text-[#6B7280]">{t('route.loadingLocations')}</p>
         </div>
       </div>
     );
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────────
+
   return (
-    <div className="min-h-screen bg-[#F5F5F5]" dir="rtl">
-      {/* Header */}
-      <section className="bg-white border-b border-[#F5F5F5]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-3 mb-6">
-              <div className="w-16 h-16 bg-[#1E3A5F] rounded-2xl flex items-center justify-center">
-                <Route className="w-8 h-8 text-white" />
-              </div>
-              <h1 className="text-4xl font-bold text-[#222222]">מסלול מומלץ</h1>
-            </div>
-            
-            {locationPermission === 'prompt' ? (
-              <div className="bg-[#F5F5F5] rounded-lg p-6 mb-8">
-                <MapIcon className="w-12 h-12 text-[#555555] mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-[#222222] mb-2">שתף את המיקום שלך</h3>
-                <p className="text-[#555555] mb-4">
-                  כדי ליצור מסלול מותאם אישית, נצטרך לגשת למיקום שלך ולהציע את המסלול הטוב ביותר עבורך
-                </p>
-                <div className="space-y-3">
-                  <Button 
-                    onClick={requestLocationPermission}
-                    disabled={isLoadingLocation}
-                    className="bg-[#1E3A5F] hover:bg-[#2C5E9E] text-white w-full sm:w-auto"
-                  >
-                    {isLoadingLocation ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        מאתר מיקום...
-                      </>
-                    ) : (
-                      <>
-                        <Navigation className="w-4 h-4 mr-2" />
-                        שתף מיקום
-                      </>
-                    )}
-                  </Button>
-                  <p className="text-sm text-[#555555]">
-                    או שנתחיל עם מסלול כללי משדרות
-                  </p>
+    <div className="min-h-screen bg-[#F2F2F2]" dir="rtl">
+
+      {/* ── Header ── */}
+      <section className="bg-white border-b border-[#EBEBEB]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+          {/* Title row */}
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-12 h-12 bg-[#1D4E8F] rounded-xl flex items-center justify-center shrink-0">
+                  <Route className="w-6 h-6 text-white" />
                 </div>
+                <h1 className="text-3xl font-bold text-[#1A1A1A]">{t('route.title')}</h1>
               </div>
-            ) : (
-              <>
-                <p className="text-xl text-[#555555] max-w-3xl mx-auto mb-8 leading-relaxed">
-                  {userLocation && isInGazaEnvelope(userLocation.lat, userLocation.lng) && locationPermission === 'granted'
-                    ? "זוהה שאתם נמצאים באזור עוטף עזה. המסלול מותאם למיקום שלכם."
-                    : "המסלול נבנה בצורה אופטימלית החל משדרות עם סדר ביקור הגיוני בין האתרים."
-                  }
-                </p>
-                
-                {routeLocations.length > 0 && (
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-6 text-[#555555] mb-8">
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-5 h-5" />
-                      <span>משך משוער: {Math.ceil(totalDuration / 60)} שעות</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-5 h-5" />
-                      <span>{routeLocations.length} תחנות</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Car className="w-5 h-5" />
-                      <span>מרחק כולל: ~{Math.round(totalDistance)} ק"מ</span>
-                    </div>
+              <p className="text-[#6B7280] text-base mr-[60px]">
+                {locationPermission === 'granted' && inGazaEnvelope(userLocation.lat, userLocation.lng)
+                  ? t('route.inGazaEnvelope') : t('route.fromSderot')}
+              </p>
+            </div>
+
+            {/* Stats */}
+            {routeLocations.length > 0 && (
+              <div className="flex flex-wrap gap-4 text-sm text-[#6B7280] lg:justify-end">
+                <div className="flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-[#1D4E8F]" />
+                  <span>{routeLocations.length} {t('route.stops')}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-[#1D4E8F]" />
+                  <span>{Math.ceil(totalDuration / 60)} {t('route.hours')}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Car className="w-4 h-4 text-[#1D4E8F]" />
+                  <span>~{Math.round(totalDistance)} {t('route.km')}</span>
+                </div>
+                {visitedCount > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <span className="text-green-600 font-medium">{visitedCount}/{routeLocations.length} {t('route.visited')}</span>
                   </div>
                 )}
-
-                <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                  <Button 
-                    onClick={scrollToMap}
-                    className="bg-[#1E3A5F] hover:bg-[#2C5E9E] text-white px-6 py-3"
-                  >
-                    {routeLocations.length > 0 ? 'התחל את המסלול' : 'צפה במפה'}
-                  </Button>
-                  
-                  {locationPermission === 'denied' && (
-                    <Button 
-                      onClick={requestLocationPermission}
-                      variant="outline"
-                      disabled={isLoadingLocation}
-                      className="border-[#1E3A5F] text-[#1E3A5F] hover:bg-[#F5F5F5] px-6 py-3"
-                    >
-                      {isLoadingLocation ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          מאתר...
-                        </>
-                      ) : (
-                        <>
-                          <MapIcon className="w-4 h-4 mr-2" />
-                          התאם למיקום שלי
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-              </>
+              </div>
             )}
-          </div>
-        </div>
-      </section>
 
-      {/* Route Map - Always show */}
-      <section id="route-map-section" className="py-12 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-[#222222]">
-              {routeLocations.length > 0 ? 'מפת המסלול' : 'מפת המקומות'}
-            </h2>
-            <p className="text-[#555555]">
-              {routeLocations.length > 0 
-                ? 'לחצו על התחנות במפה לקבלת מידע נוסף'
-                : locationPermission === 'denied' 
-                  ? 'המסלול מתחיל בשדרות ומותאם לסדר מסלול הגיוני'
-                  : 'שתפו את המיקום שלכם כדי לקבל מסלול מותאם אישית'
-              }
-            </p>
-          </div>
-          
-          <Card className="overflow-hidden bg-white border-0 shadow-lg">
-            <div id="route-map" className="h-96 sm:h-[500px] w-full bg-[#F5F5F5]"></div>
-          </Card>
-        </div>
-      </section>
-
-      {/* Route Stations - Only show if route exists */}
-      {routeLocations.length > 0 && (
-        <section className="py-16 bg-[#F5F5F5]">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-bold text-[#222222]">תחנות המסלול</h2>
-              {locationPermission === 'denied' && (
-                <Button 
-                  onClick={requestLocationPermission}
-                  variant="outline"
-                  size="sm"
-                  disabled={isLoadingLocation}
-                  className="border-[#1E3A5F] text-[#1E3A5F] hover:bg-[#F5F5F5]"
-                >
-                  {isLoadingLocation ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      מאתר...
-                    </>
-                  ) : (
-                    <>
-                      <MapIcon className="w-4 h-4 mr-2" />
-                      התאם למיקום שלי
-                    </>
-                  )}
+            {/* Action buttons */}
+            <div className="flex flex-wrap gap-3 lg:shrink-0">
+              {locationPermission !== 'granted' && (
+                <Button onClick={requestLocation} disabled={locationPermission === 'loading'}
+                  variant="outline" className="border-[#1D4E8F] text-[#1D4E8F] hover:bg-[#F2F2F2]">
+                  {locationPermission === 'loading'
+                    ? <><Loader2 className="w-4 h-4 ml-2 animate-spin" />{t('route.locatingPosition')}</>
+                    : <><Navigation2 className="w-4 h-4 ml-2" />{t('route.adjustToMyLocation')}</>}
+                </Button>
+              )}
+              {routeLocations.length > 0 && (
+                <Button onClick={startNavigation} className="bg-[#1D4E8F] hover:bg-[#2560B0] text-white">
+                  <Navigation className="w-4 h-4 ml-2" />
+                  {t('route.startNavigation')}
                 </Button>
               )}
             </div>
-            
-            <div className="space-y-4 lg:space-y-6">
-              {routeLocations.map((location, index) => {
-                const distanceFromPrevious = index === 0 && userLocation ? 
-                  calculateDistance(userLocation.lat, userLocation.lng, location.coordinates.lat, location.coordinates.lng) :
-                  index > 0 ? calculateDistance(
-                    routeLocations[index - 1].coordinates.lat,
-                    routeLocations[index - 1].coordinates.lng,
-                    location.coordinates.lat,
-                    location.coordinates.lng
-                  ) : 0;
-                
-                const duration = Math.ceil(distanceFromPrevious / 50 * 60); // Assuming 50 km/h average
-                const recommendedTime = getRecommendedTime(location);
-                
-                return (
-                  <Card key={location.id} className="bg-white hover:shadow-lg transition-shadow border-0 overflow-hidden">
-                    <CardContent className="p-0">
-                      <div className="flex flex-col lg:flex-row">
-                        {/* Station Number and Info */}
-                        <div className="p-4 sm:p-6 flex gap-3 sm:gap-4 flex-1">
-                          <div className="flex-shrink-0">
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#1E3A5F] rounded-full flex items-center justify-center">
-                              <span className="text-white font-bold text-sm sm:text-lg">{index + 1}</span>
+          </div>
+
+          {/* ── Route mode selector ── */}
+          {allLocations.length > 0 && (
+            <div className="mt-6 pt-5 border-t border-[#EBEBEB]">
+              <p className="text-sm font-medium text-[#1A1A1A] mb-3">{t('route.mode.label')}</p>
+              <div className="flex flex-wrap gap-2 items-center">
+                {[
+                  { id: 'essential',   labelKey: 'route.mode.essential',   descKey: 'route.mode.essentialDesc',   dot: 'bg-red-500'   },
+                  { id: 'recommended', labelKey: 'route.mode.recommended', descKey: 'route.mode.recommendedDesc', dot: 'bg-[#1D4E8F]' },
+                  { id: 'full',        labelKey: 'route.mode.full',        descKey: 'route.mode.fullDesc',        dot: 'bg-[#6B7280]' },
+                  { id: 'custom',      labelKey: 'route.mode.custom',      descKey: null,                         dot: 'bg-amber-500' },
+                ].map(({ id, labelKey, descKey, dot }) => {
+                  const active = routeMode === id;
+                  return (
+                    <button key={id} onClick={() => applyMode(id)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+                        active ? 'bg-[#1D4E8F] text-white border-[#1D4E8F]'
+                               : 'bg-white text-[#444] border-[#D0D5DD] hover:border-[#1D4E8F] hover:text-[#1D4E8F]'
+                      }`}>
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${active ? 'bg-white' : dot}`} />
+                      {t(labelKey)}
+                      {descKey && <span className={`text-xs ${active ? 'text-blue-200' : 'text-[#6B7280]'}`}> — {t(descKey)}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Time budget slider */}
+              {routeMode === 'custom' && (
+                <div className="mt-4 max-w-sm">
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="text-[#6B7280]">{t('route.mode.budgetLabel')}</span>
+                    <span className="font-semibold text-[#1D4E8F]">{hoursBudget} {t('route.mode.hours')}</span>
+                  </div>
+                  <input type="range" min={2} max={9} step={0.5} value={hoursBudget}
+                    onChange={e => applyMode('custom', parseFloat(e.target.value))}
+                    className="w-full accent-[#1D4E8F] cursor-pointer" />
+                  <div className="flex justify-between text-xs text-[#6B7280] mt-1">
+                    <span>2 {t('route.mode.hours')}</span>
+                    <span>9 {t('route.mode.hours')}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* No essential locations hint */}
+              {routeMode === 'essential' && !allLocations.some(l => l.priority === 'essential') && (
+                <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 max-w-lg">
+                  💡 {t('route.mode.noPriorityHint')}
+                </p>
+              )}
+
+              {/* Customization hint */}
+              <p className="mt-3 text-xs text-[#6B7280]">
+                {t('route.customizeHint')}
+              </p>
+            </div>
+          )}
+
+          {/* Progress bar */}
+          {routeLocations.length > 0 && visitedCount > 0 && (
+            <div className="mt-5 max-w-lg">
+              <div className="flex justify-between text-xs text-[#6B7280] mb-1">
+                <span>{t('route.visited')}: {visitedCount} / {routeLocations.length}</span>
+                <span>{Math.round(visitedCount / routeLocations.length * 100)}%</span>
+              </div>
+              <div className="h-2 bg-[#F2F2F2] rounded-full overflow-hidden">
+                <div className="h-full bg-green-500 rounded-full transition-all duration-500"
+                  style={{ width: `${visitedCount / routeLocations.length * 100}%` }} />
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── Main: stops list + sticky map ── */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+
+          {/* Stops list */}
+          <div className="lg:col-span-3 space-y-1">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-[#1A1A1A]">{t('route.stopsTitle')}</h2>
+              {routeLocations.length < allLocations.length && (
+                <Button variant="ghost" size="sm" onClick={resetRoute}
+                  className="text-xs text-[#6B7280] hover:text-[#1D4E8F] gap-1">
+                  <RotateCcw className="w-3 h-3" />
+                  {t('route.resetRoute')}
+                </Button>
+              )}
+            </div>
+
+            {routeLocations.map((location, index) => {
+              const prev = index === 0 ? userLocation : routeLocations[index - 1]?.coordinates;
+              const distFromPrev  = prev && location.coordinates
+                ? haversine(prev.lat, prev.lng, location.coordinates.lat, location.coordinates.lng) : 0;
+              const driveMinutes  = Math.ceil(distFromPrev / 50 * 60);
+              const recommendedTime = getRecommendedTime(location);
+              const isVisited     = visitedLocations.includes(location.id);
+
+              return (
+                <React.Fragment key={location.id}>
+                  {index > 0 && distFromPrev > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-0.5">
+                      <div className="w-px h-4 bg-[#D0D5DD] mx-[19px]" />
+                      <span className="text-xs text-[#6B7280]">
+                        <Car className="w-3 h-3 inline ml-1" />
+                        {Math.round(distFromPrev)} {t('route.km')} — {driveMinutes} {t('route.minutes')} נסיעה
+                      </span>
+                    </div>
+                  )}
+
+                  <Card className={`bg-white hover:shadow-md transition-shadow overflow-hidden ${isVisited ? 'border-2 border-green-400' : 'border-0 shadow-sm'}`}>
+                    <CardContent className="p-4">
+                      <div className="flex gap-4">
+                        {/* Number */}
+                        <div className="flex-shrink-0">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-sm ${isVisited ? 'bg-green-500' : 'bg-[#1D4E8F]'}`}>
+                            {isVisited ? <CheckCircle2 className="w-5 h-5" /> : index + 1}
+                          </div>
+                        </div>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <Link to={createPageUrl(`Location?id=${location.id}`)}
+                              onClick={() => incrementViewCount(location.id)}
+                              className="flex-1 hover:text-[#2560B0] transition-colors">
+                              <h3 className="text-base font-semibold text-[#1A1A1A] leading-tight">{locName(location)}</h3>
+                            </Link>
+                            <div className="flex items-center gap-0.5 flex-shrink-0">
+                              <Button variant="ghost" size="sm" onClick={() => toggleVisited(location.id)}
+                                title={t('route.markVisited')}
+                                className={`p-1 h-auto ${isVisited ? 'text-green-600' : 'text-[#6B7280] hover:text-green-600'}`}>
+                                {isVisited ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => removeFromRoute(location.id)}
+                                className="p-1 h-auto text-[#6B7280] hover:text-red-500">
+                                <X className="w-4 h-4" />
+                              </Button>
                             </div>
-                            {index < routeLocations.length - 1 && (
-                              <div className="w-0.5 h-12 sm:h-16 bg-[#F5F5F5] mx-auto mt-4"></div>
+                          </div>
+
+                          <p className="text-sm text-[#6B7280] mb-2 leading-relaxed line-clamp-2">
+                            {locStoryTitle(location) || t('route.defaultStory')}
+                          </p>
+
+                          <div className="flex flex-wrap items-center gap-2 mb-3">
+                            <Badge variant="outline" className="text-xs border-[#1D4E8F] text-[#1D4E8F] px-2">
+                              {location.category}
+                            </Badge>
+                            <span className="text-xs text-[#1D4E8F] font-medium">⏱ {recommendedTime} {t('route.minutes')}</span>
+                            {location.audio_file && <span className="text-xs text-purple-600">🎧 הקלטה</span>}
+                          </div>
+
+                          <div className="flex gap-2">
+                            <Link to={createPageUrl(`Location?id=${location.id}`)}>
+                              <Button size="sm" className="bg-[#1D4E8F] hover:bg-[#2560B0] text-white text-xs h-8">
+                                <Info className="w-3 h-3 ml-1" />{t('route.moreInfo')}
+                              </Button>
+                            </Link>
+                            {location.coordinates && (
+                              <Button size="sm" variant="outline"
+                                className="border-[#1D4E8F] text-[#1D4E8F] hover:bg-[#F2F2F2] text-xs h-8"
+                                onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${location.coordinates.lat},${location.coordinates.lng}&travelmode=driving`, '_blank')}>
+                                <Navigation className="w-3 h-3 ml-1" />{t('route.navigateTo')}
+                              </Button>
                             )}
                           </div>
-                          
-                          <div className="flex-1 min-w-0">
-                            <div className="flex flex-col lg:flex-row lg:items-start gap-3 sm:gap-4">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between mb-2">
-                                  <Link 
-                                    to={createPageUrl(`Location?id=${location.id}`)}
-                                    onClick={() => incrementViewCount(location.id)}
-                                    className="hover:text-[#2C5E9E] transition-colors flex-1"
-                                  >
-                                    <h3 className="text-lg sm:text-xl font-semibold text-[#222222] break-words">{location.name}</h3>
-                                  </Link>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => removeFromRoute(location.id)}
-                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 flex-shrink-0 mr-2"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                                
-                                <p className="text-[#555555] mb-3 sm:mb-4 leading-relaxed text-sm sm:text-base break-words">
-                                  {location.full_story?.title || 'אתר זיכרון משמעותי מאירועי 7 באוקטובר 2023'}
-                                </p>
-                                
-                                <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-[#555555] mb-3 sm:mb-4">
-                                  {distanceFromPrevious > 0 && (
-                                    <>
-                                      <span className="break-words">מרחק מהתחנה הקודמת: {Math.round(distanceFromPrevious)} ק"מ</span>
-                                      <span className="hidden sm:inline">•</span>
-                                      <span className="break-words">זמן נסיעה: {duration} דקות</span>
-                                      <span className="hidden sm:inline">•</span>
-                                    </>
-                                  )}
-                                  <span className="break-words font-medium text-[#1E3A5F]">זמן מומלץ באתר: {recommendedTime} דקות</span>
-                                  <Badge className="bg-[#F5F5F5] text-[#1E3A5F] border-[#1E3A5F] text-xs">
-                                    {location.category}
-                                  </Badge>
-                                </div>
-                              </div>
-                              
-                              {/* Location Image - Clickable */}
-                              <div className="w-full lg:w-40 xl:w-48 flex-shrink-0">
-                                <Link 
-                                  to={createPageUrl(`Location?id=${location.id}`)}
-                                  onClick={() => incrementViewCount(location.id)}
-                                >
-                                  <div className="aspect-video rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity border border-gray-200 hover:border-[#1E3A5F]">
-                                    {location.main_image ? (
-                                      <img
-                                        src={location.main_image}
-                                        alt={location.name}
-                                        className="w-full h-full object-cover"
-                                      />
-                                    ) : (
-                                      <div className="w-full h-full bg-[#F5F5F5] flex items-center justify-center">
-                                        <MapPin className="w-6 h-6 sm:w-8 sm:h-8 text-[#555555]" />
-                                      </div>
-                                    )}
-                                  </div>
-                                </Link>
-                              </div>
-                            </div>
-                            
-                            {/* Actions */}
-                            <div className="flex flex-col sm:flex-row gap-2 mt-3 sm:mt-4">
-                              <Link to={createPageUrl(`Location?id=${location.id}`)}>
-                                <Button className="bg-[#1E3A5F] hover:bg-[#2C5E9E] text-white w-full sm:w-auto text-sm">
-                                  <Info className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
-                                  למידע נוסף
-                                </Button>
+                        </div>
+
+                        {/* Thumbnail */}
+                        <div className="hidden sm:block w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-[#F2F2F2]">
+                          {location.main_image
+                            ? <Link to={createPageUrl(`Location?id=${location.id}`)} onClick={() => incrementViewCount(location.id)}>
+                                <img src={location.main_image} alt={location.name} className="w-full h-full object-cover hover:opacity-80 transition-opacity" />
                               </Link>
-                              {location.coordinates && (
-                                <Button 
-                                  variant="outline" 
-                                  className="border-[#1E3A5F] text-[#1E3A5F] hover:bg-[#F5F5F5] w-full sm:w-auto text-sm"
-                                  onClick={() => {
-                                    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${location.coordinates.lat},${location.coordinates.lng}&travelmode=driving`;
-                                    window.open(googleMapsUrl, '_blank');
-                                  }}
-                                >
-                                  <Navigation className="w-3 h-3 sm:w-4 sm:h-4 mr-2" />
-                                  נווט למקום
-                                </Button>
-                              )}
-                            </div>
-                          </div>
+                            : <div className="w-full h-full flex items-center justify-center"><MapPin className="w-6 h-6 text-[#6B7280]" /></div>
+                          }
                         </div>
                       </div>
                     </CardContent>
                   </Card>
-                );
-              })}
+                </React.Fragment>
+              );
+            })}
+
+            {/* ── Not in route — add back section ── */}
+            {notInRoute.length > 0 && (
+              <div className="mt-6">
+                <button
+                  onClick={() => setShowNotInRoute(v => !v)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-dashed border-[#D0D5DD] hover:border-[#1D4E8F] text-sm text-[#6B7280] hover:text-[#1D4E8F] transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    {t('route.notInRoute')} ({notInRoute.length})
+                  </span>
+                  {showNotInRoute ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+
+                {showNotInRoute && (
+                  <div className="mt-2 space-y-2">
+                    <p className="text-xs text-[#6B7280] px-1 pb-1">{t('route.notInRouteHint')}</p>
+                    {notInRoute.map(location => (
+                      <Card key={location.id} className="bg-white border-0 shadow-sm opacity-80 hover:opacity-100 transition-opacity">
+                        <CardContent className="p-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-[#F2F2F2]">
+                              {location.main_image
+                                ? <img src={location.main_image} alt={location.name} className="w-full h-full object-cover" />
+                                : <div className="w-full h-full flex items-center justify-center"><MapPin className="w-4 h-4 text-[#6B7280]" /></div>
+                              }
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-[#1A1A1A] truncate">{locName(location)}</p>
+                              <p className="text-xs text-[#6B7280] truncate">{locStoryTitle(location) || location.category}</p>
+                            </div>
+                            <Button size="sm" onClick={() => addToRoute(location)}
+                              className="bg-[#1D4E8F] hover:bg-[#2560B0] text-white text-xs h-8 shrink-0 gap-1">
+                              <Plus className="w-3 h-3" />
+                              {t('route.addToRoute')}
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Sticky map */}
+          <div className="lg:col-span-2">
+            <div className="lg:sticky lg:top-6">
+              <h2 className="text-xl font-bold text-[#1A1A1A] mb-3">{t('route.mapTitle')}</h2>
+              <Card className="overflow-hidden bg-white border-0 shadow-sm">
+                <div ref={mapDivRef} className="h-80 sm:h-96 lg:h-[calc(100vh-160px)] min-h-[400px] max-h-[700px] w-full bg-[#EDE9E3]">
+                  {!mapReady && (
+                    <div className="h-full flex flex-col items-center justify-center gap-3">
+                      <div className="w-10 h-10 border-4 border-[#1D4E8F] border-t-transparent rounded-full animate-spin" />
+                      <p className="text-[#6B7280] text-sm">טוען מפה...</p>
+                    </div>
+                  )}
+                </div>
+              </Card>
             </div>
           </div>
-        </section>
-      )}
+        </div>
+      </div>
 
-      {/* Important Notes */}
+      {/* ── Important Notes ── */}
       <section className="py-12 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <Card className="bg-yellow-50 border-yellow-200">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-[#222222]">
+              <CardTitle className="flex items-center gap-2 text-[#1A1A1A]">
                 <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                הערות חשובות למטיילים
+                {t('route.importantNotes')}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3 text-[#555555]">
-                <p>• <strong>שעות פעילות:</strong> מומלץ לבקר בשעות היום בלבד (06:00-18:00)</p>
-                <p>• <strong>ביטחון:</strong> יש להישאר בשטחים המותרים ולציית להנחיות הביטחון המקומיות</p>
-                <p>• <strong>מים ושירותים:</strong> המלצה להביא מים ולתכנן הפסקות בישובים עם שירותים</p>
-                <p>• <strong>טלפון חירום:</strong> 100 משטרה, 101 מד"א, 102 כיבוי אש</p>
-                <p>• <strong>מזג אויר:</strong> בדקו תחזית מזג האוויר לפני היציאה</p>
+              <div className="space-y-3 text-[#6B7280]">
+                <p>• <strong>{t('route.note.hoursLabel')}</strong> {t('route.note.hours')}</p>
+                <p>• <strong>{t('route.note.securityLabel')}</strong> {t('route.note.security')}</p>
+                <p>• <strong>{t('route.note.waterLabel')}</strong> {t('route.note.water')}</p>
+                <p>• <strong>{t('route.note.emergencyLabel')}</strong> {t('route.note.emergency')}</p>
+                <p>• <strong>{t('route.note.weatherLabel')}</strong> {t('route.note.weather')}</p>
               </div>
             </CardContent>
           </Card>
         </div>
       </section>
-
-      {/* Fixed Navigation Button - Only show if route exists */}
-      {routeLocations.length > 0 && (
-        <div className="fixed bottom-20 lg:bottom-6 left-6 z-50">
-          <Button 
-            onClick={startNavigation}
-            className="bg-[#1E3A5F] hover:bg-[#2C5E9E] text-white shadow-lg px-6 py-3 rounded-full"
-          >
-            <Navigation className="w-5 h-5 mr-2" />
-            התחל ניווט
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

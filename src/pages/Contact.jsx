@@ -63,28 +63,28 @@ ${formData.message}
 
   if (isSubmitted) {
     return (
-      <div className="min-h-screen bg-[#F5F5F5] flex items-center justify-center">
+      <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
         <div className="max-w-md mx-auto text-center">
-          <CheckCircle className="w-16 h-16 text-[#1E3A5F] mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-[#222222] mb-2">ההודעה נשלחה בהצלחה</h1>
-          <p className="text-[#555555] mb-6">תודה על פנייתכם. נחזור אליכם בהקדם האפשרי.</p>
-          <Button onClick={() => setIsSubmitted(false)} className="bg-[#1E3A5F] hover:bg-[#2C5E9E]">שלח הודעה נוספת</Button>
+          <CheckCircle className="w-16 h-16 text-[#1D4E8F] mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-[#1A1A1A] mb-2">ההודעה נשלחה בהצלחה</h1>
+          <p className="text-[#6B7280] mb-6">תודה על פנייתכם. נחזור אליכם בהקדם האפשרי.</p>
+          <Button onClick={() => setIsSubmitted(false)} className="bg-[#1D4E8F] hover:bg-[#2560B0]">שלח הודעה נוספת</Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F5F5]">
+    <div className="min-h-screen bg-[#F2F2F2]">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center mb-12">
           <div className="flex justify-center mb-6">
-            <div className="w-20 h-20 bg-[#1E3A5F] rounded-2xl flex items-center justify-center shadow-lg">
+            <div className="w-20 h-20 bg-[#1D4E8F] rounded-2xl flex items-center justify-center shadow-lg">
               <Mail className="w-12 h-12 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-[#222222] mb-4">צור קשר</h1>
-          <p className="text-lg text-[#555555]">נשמח לעזור ולענות על שאלותיכם</p>
+          <h1 className="text-3xl md:text-4xl font-bold text-[#1A1A1A] mb-4">צור קשר</h1>
+          <p className="text-lg text-[#6B7280]">נשמח לעזור ולענות על שאלותיכם</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -92,22 +92,22 @@ ${formData.message}
           <div className="lg:col-span-1">
             <Card className="shadow-lg bg-white border-0">
               <CardHeader>
-                <CardTitle className="text-[#222222]">פרטי יצירת קשר</CardTitle>
+                <CardTitle className="text-[#1A1A1A]">פרטי יצירת קשר</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="flex items-start gap-3">
-                  <Mail className="w-5 h-5 text-[#1E3A5F] mt-1" />
+                  <Mail className="w-5 h-5 text-[#1D4E8F] mt-1" />
                   <div>
-                    <p className="font-medium text-[#222222]">אימייל</p>
-                    <p className="text-[#555555]">sniryulzari@gmail.com</p>
+                    <p className="font-medium text-[#1A1A1A]">אימייל</p>
+                    <p className="text-[#6B7280]">sniryulzari@gmail.com</p>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <MapPin className="w-5 h-5 text-[#1E3A5F] mt-1" />
+                  <MapPin className="w-5 h-5 text-[#1D4E8F] mt-1" />
                   <div>
-                    <p className="font-medium text-[#222222]">מיקום</p>
-                    <p className="text-[#555555]">ישראל</p>
+                    <p className="font-medium text-[#1A1A1A]">מיקום</p>
+                    <p className="text-[#6B7280]">ישראל</p>
                   </div>
                 </div>
               </CardContent>
@@ -118,24 +118,24 @@ ${formData.message}
           <div className="lg:col-span-2">
             <Card className="shadow-lg bg-white border-0">
               <CardHeader>
-                <CardTitle className="text-[#222222]">שלחו לנו הודעה</CardTitle>
+                <CardTitle className="text-[#1A1A1A]">שלחו לנו הודעה</CardTitle>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>
-                      <Label htmlFor="name" className="block mb-2 text-[#222222]">שם מלא</Label>
+                      <Label htmlFor="name" className="block mb-2 text-[#1A1A1A]">שם מלא</Label>
                       <Input
                         id="name"
                         name="name"
                         value={formData.name}
                         onChange={handleInputChange}
                         required
-                        className="w-full border-[#F5F5F5] focus:border-[#1E3A5F] text-[#222222]"
+                        className="w-full border-[#F2F2F2] focus:border-[#1D4E8F] text-[#1A1A1A]"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="email" className="block mb-2 text-[#222222]">אימייל</Label>
+                      <Label htmlFor="email" className="block mb-2 text-[#1A1A1A]">אימייל</Label>
                       <Input
                         id="email"
                         name="email"
@@ -143,18 +143,18 @@ ${formData.message}
                         value={formData.email}
                         onChange={handleInputChange}
                         required
-                        className="w-full border-[#F5F5F5] focus:border-[#1E3A5F] text-[#222222]"
+                        className="w-full border-[#F2F2F2] focus:border-[#1D4E8F] text-[#1A1A1A]"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <Label className="block mb-2 text-[#222222]">נושא הפנייה</Label>
+                    <Label className="block mb-2 text-[#1A1A1A]">נושא הפנייה</Label>
                     <Select value={formData.subject} onValueChange={handleSubjectChange}>
-                      <SelectTrigger className="border-[#F5F5F5] focus:border-[#1E3A5F]">
+                      <SelectTrigger className="border-[#F2F2F2] focus:border-[#1D4E8F]">
                         <SelectValue placeholder="בחרו נושא" />
                       </SelectTrigger>
-                      <SelectContent className="bg-white border-[#F5F5F5]">
+                      <SelectContent className="bg-white border-[#F2F2F2]">
                         <SelectItem value="הוספת מקום חדש">הוספת מקום חדש</SelectItem>
                         <SelectItem value="תיקון מידע">תיקון מידע קיים</SelectItem>
                         <SelectItem value="בעיה טכנית">בעיה טכנית</SelectItem>
@@ -165,7 +165,7 @@ ${formData.message}
                   </div>
 
                   <div>
-                    <Label htmlFor="message" className="block mb-2 text-[#222222]">הודעה</Label>
+                    <Label htmlFor="message" className="block mb-2 text-[#1A1A1A]">הודעה</Label>
                     <Textarea
                       id="message"
                       name="message"
@@ -173,7 +173,7 @@ ${formData.message}
                       onChange={handleInputChange}
                       required
                       rows={6}
-                      className="w-full border-[#F5F5F5] focus:border-[#1E3A5F] text-[#222222]"
+                      className="w-full border-[#F2F2F2] focus:border-[#1D4E8F] text-[#1A1A1A]"
                       placeholder="כתבו כאן את ההודעה שלכם..."
                     />
                   </div>
@@ -181,7 +181,7 @@ ${formData.message}
                   <Button
                     type="submit"
                     disabled={isSubmitting}
-                    className="w-full bg-[#1E3A5F] hover:bg-[#2C5E9E]"
+                    className="w-full bg-[#1D4E8F] hover:bg-[#2560B0]"
                   >
                     {isSubmitting ? (
                       <>

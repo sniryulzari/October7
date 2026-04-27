@@ -1,100 +1,141 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Route, Map, Search, Home, Mail, Shield, FileText, Settings, LogIn } from 'lucide-react';
-import { User } from '@/api/entities';
+import { Route, Map, Search, Home, Mail, Shield, FileText, Settings, LogIn, Languages, Menu, X } from 'lucide-react';
+import { useAuth } from '@/api/AuthContext';
+import { useLanguage } from '@/utils/language';
 
 export default function PublicLayout({ children }) {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user: currentUser, isLoading } = useAuth();
+  const { t, lang, toggleLang, isRTL } = useLanguage();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const currentYear = new Date().getFullYear();
 
-  useEffect(() => {
-    checkUserRole();
-  }, []);
-
-  const checkUserRole = async () => {
-    try {
-      const user = await User.me();
-      setCurrentUser(user);
-    } catch {
-      setCurrentUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-[#F5F5F5] flex flex-col" dir="rtl">
+    <div className="min-h-screen bg-[#F2F2F2] flex flex-col" dir={isRTL ? 'rtl' : 'ltr'}>
       {/* Navigation */}
-      <nav className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-50">
+      <nav className="bg-[#0C1C2E] border-b border-white/10 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link to={createPageUrl("Home")} className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-[#1E3A5F] rounded-lg flex items-center justify-center">
+              <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
                 <Route className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-[#222222] hidden sm:block">זיכרון 7.10</span>
+              <span className="text-xl font-bold text-white hidden sm:block">{t('app.name')}</span>
             </Link>
-            
-            <div className="flex items-center gap-2 sm:gap-4">
+
+            {/* Desktop nav */}
+            <div className="hidden sm:flex items-center gap-2">
               <Link to={createPageUrl("Home")}>
-                <Button variant="ghost" size="sm" className="text-[#555555] hover:text-[#1E3A5F] hover:bg-gray-50">
-                  <Home className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">בית</span>
+                <Button variant="ghost" size="sm" className="text-white/60 hover:text-white hover:bg-white/10">
+                  <Home className="w-4 h-4 mr-2" />
+                  {t('nav.home')}
                 </Button>
               </Link>
               <Link to={createPageUrl("Map")}>
-                <Button variant="ghost" size="sm" className="text-[#555555] hover:text-[#1E3A5F] hover:bg-gray-50">
-                  <Map className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">מפה</span>
+                <Button variant="ghost" size="sm" className="text-white/60 hover:text-white hover:bg-white/10">
+                  <Map className="w-4 h-4 mr-2" />
+                  {t('nav.map')}
                 </Button>
               </Link>
               <Link to={createPageUrl("Search")}>
-                <Button variant="ghost" size="sm" className="text-[#555555] hover:text-[#1E3A5F] hover:bg-gray-50">
-                  <Search className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">חיפוש</span>
+                <Button variant="ghost" size="sm" className="text-white/60 hover:text-white hover:bg-white/10">
+                  <Search className="w-4 h-4 mr-2" />
+                  {t('nav.search')}
                 </Button>
               </Link>
               <Link to={createPageUrl("Route")}>
-                <Button variant="ghost" size="sm" className="text-[#555555] hover:text-[#1E3A5F] hover:bg-gray-50">
-                  <Route className="w-4 h-4 sm:mr-2" />
-                  <span className="hidden sm:inline">מסלול</span>
+                <Button variant="ghost" size="sm" className="text-white/60 hover:text-white hover:bg-white/10">
+                  <Route className="w-4 h-4 mr-2" />
+                  {t('nav.route')}
                 </Button>
               </Link>
-              
-              {/* Admin link or Login button depending on auth state */}
+              <Button variant="ghost" size="sm" onClick={toggleLang} className="text-white/60 hover:text-white hover:bg-white/10 gap-1">
+                <Languages className="w-4 h-4" />
+                <span className="text-xs font-semibold">{lang === 'he' ? 'EN' : 'עב'}</span>
+              </Button>
               {!isLoading && (
                 currentUser?.role === 'admin' ? (
                   <Link to={createPageUrl("AdminDashboard")}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-[#1E3A5F] hover:text-white hover:bg-[#1E3A5F] border border-[#1E3A5F]"
-                    >
-                      <Settings className="w-4 h-4 sm:mr-2" />
-                      <span className="hidden sm:inline">ניהול</span>
+                    <Button variant="ghost" size="sm" className="text-white border border-white/30 hover:bg-white/20 hover:text-white">
+                      <Settings className="w-4 h-4 mr-2" />
+                      {t('nav.admin')}
                     </Button>
                   </Link>
                 ) : !currentUser ? (
                   <Link to={createPageUrl("Login")}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-[#555555] hover:text-[#1E3A5F] hover:bg-gray-50"
-                    >
-                      <LogIn className="w-4 h-4 sm:mr-2" />
-                      <span className="hidden sm:inline">כניסה</span>
+                    <Button variant="ghost" size="sm" className="text-white/60 hover:text-white hover:bg-white/10">
+                      <LogIn className="w-4 h-4 mr-2" />
+                      {t('nav.login')}
                     </Button>
                   </Link>
                 ) : null
               )}
             </div>
+
+            {/* Mobile nav — Map + Route + Language + Hamburger */}
+            <div className="flex sm:hidden items-center gap-1">
+              <Link to={createPageUrl("Map")}>
+                <Button variant="ghost" size="sm" className="text-white/60 hover:text-white hover:bg-white/10 px-3">
+                  <Map className="w-5 h-5" />
+                </Button>
+              </Link>
+              <Link to={createPageUrl("Route")}>
+                <Button variant="ghost" size="sm" className="text-white/60 hover:text-white hover:bg-white/10 px-3">
+                  <Route className="w-5 h-5" />
+                </Button>
+              </Link>
+              <Button variant="ghost" size="sm" onClick={toggleLang} className="text-white/60 hover:text-white hover:bg-white/10 gap-1 px-2">
+                <span className="text-xs font-bold">{lang === 'he' ? 'EN' : 'עב'}</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setMobileMenuOpen(o => !o)}
+                className="text-white/60 hover:text-white hover:bg-white/10 px-3"
+              >
+                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </Button>
+            </div>
           </div>
         </div>
+
+        {/* Mobile dropdown — white on dark nav for clear contrast */}
+        {mobileMenuOpen && (
+          <div className="sm:hidden bg-white border-t border-white/10 px-4 py-3 space-y-1">
+            <Link to={createPageUrl("Home")} onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="ghost" size="sm" className="w-full justify-start text-[#6B7280] hover:text-[#1D4E8F] hover:bg-[#F2F2F2]">
+                <Home className="w-4 h-4 mr-2" />
+                {t('nav.home')}
+              </Button>
+            </Link>
+            <Link to={createPageUrl("Search")} onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="ghost" size="sm" className="w-full justify-start text-[#6B7280] hover:text-[#1D4E8F] hover:bg-[#F2F2F2]">
+                <Search className="w-4 h-4 mr-2" />
+                {t('nav.search')}
+              </Button>
+            </Link>
+            {!isLoading && (
+              currentUser?.role === 'admin' ? (
+                <Link to={createPageUrl("AdminDashboard")} onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" size="sm" className="w-full justify-start text-[#1D4E8F] border border-[#1D4E8F] hover:bg-[#1D4E8F] hover:text-white">
+                    <Settings className="w-4 h-4 mr-2" />
+                    {t('nav.admin')}
+                  </Button>
+                </Link>
+              ) : !currentUser ? (
+                <Link to={createPageUrl("Login")} onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" size="sm" className="w-full justify-start text-[#6B7280] hover:text-[#1D4E8F] hover:bg-[#F2F2F2]">
+                    <LogIn className="w-4 h-4 mr-2" />
+                    {t('nav.login')}
+                  </Button>
+                </Link>
+              ) : null
+            )}
+          </div>
+        )}
       </nav>
 
       {/* Main Content */}
@@ -103,69 +144,62 @@ export default function PublicLayout({ children }) {
       </main>
 
       {/* Footer */}
-      <footer className="bg-[#1E3A5F] text-white mt-16">
+      <footer className="bg-[#0C1C2E] text-white mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* About */}
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
                   <Route className="w-5 h-5 text-white" />
                 </div>
-                <h3 className="text-lg font-semibold">זיכרון 7.10</h3>
+                <h3 className="text-lg font-semibold">{t('app.name')}</h3>
               </div>
-              <p className="text-white/80 text-sm leading-relaxed">
-                אפליקציה המתעדת ומנציחה את אתרי הזיכרון מאירועי 7 באוקטובר 2023, 
-                ומאפשרת למשתמשים לחוות את הסיפורים דרך מסלולי טיול מודרכים.
-              </p>
+              <p className="text-white/80 text-sm leading-relaxed">{t('footer.desc')}</p>
             </div>
 
-            {/* Quick Links */}
             <div>
-              <h3 className="text-lg font-semibold mb-4">קישורים מהירים</h3>
+              <h3 className="text-lg font-semibold mb-4">{t('footer.quickLinks')}</h3>
               <div className="space-y-2">
                 <Link to={createPageUrl("Map")} className="block text-white/80 hover:text-white text-sm transition-colors">
-                  מפת האתרים
+                  {t('footer.mapOfSites')}
                 </Link>
                 <Link to={createPageUrl("Route")} className="block text-white/80 hover:text-white text-sm transition-colors">
-                  מסלול מומלץ
+                  {t('footer.recommendedRoute')}
                 </Link>
                 <Link to={createPageUrl("Search")} className="block text-white/80 hover:text-white text-sm transition-colors">
-                  חיפוש מקומות
+                  {t('footer.searchLocations')}
                 </Link>
                 <Link to={createPageUrl("About")} className="block text-white/80 hover:text-white text-sm transition-colors">
-                  אודות
+                  {t('footer.about')}
                 </Link>
               </div>
             </div>
 
-            {/* Contact & Legal */}
             <div>
-              <h3 className="text-lg font-semibold mb-4">יצירת קשר ומידע משפטי</h3>
+              <h3 className="text-lg font-semibold mb-4">{t('footer.contactLegal')}</h3>
               <div className="space-y-2">
                 <Link to={createPageUrl("Contact")} className="block text-white/80 hover:text-white text-sm transition-colors">
                   <Mail className="w-4 h-4 inline mr-2" />
-                  יצירת קשר
+                  {t('footer.contact')}
                 </Link>
                 <Link to={createPageUrl("Privacy")} className="block text-white/80 hover:text-white text-sm transition-colors">
                   <Shield className="w-4 h-4 inline mr-2" />
-                  מדיניות פרטיות
+                  {t('footer.privacy')}
                 </Link>
                 <Link to={createPageUrl("About")} className="block text-white/80 hover:text-white text-sm transition-colors">
                   <FileText className="w-4 h-4 inline mr-2" />
-                  תנאי שימוש
+                  {t('footer.terms')}
                 </Link>
               </div>
             </div>
           </div>
 
-          {/* Bottom Bar */}
           <div className="border-t border-white/20 mt-8 pt-8 flex flex-col sm:flex-row justify-between items-center">
             <p className="text-white/60 text-sm">
               Copyright © {currentYear} Snir Yulzari All rights reserved.
             </p>
             <p className="text-white/60 text-sm mt-2 sm:mt-0">
-              לזכר חללי ונספי 7 באוקטובר 2023
+              {t('footer.memorial')}
             </p>
           </div>
         </div>

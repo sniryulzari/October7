@@ -33,6 +33,9 @@ import Login from "./Login";
 import ResetPassword from "./ResetPassword";
 
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
+import { LanguageProvider } from '../utils/language';
+import { AuthProvider } from '../api/AuthContext';
+import { createPageUrl } from '../utils';
 
 const PAGES = {
     
@@ -83,50 +86,17 @@ function _getCurrentPage(url) {
     return pageName || Object.keys(PAGES)[0];
 }
 
-// Create a wrapper component that uses useLocation inside the Router context
 function PagesContent() {
     const location = useLocation();
     const currentPage = _getCurrentPage(location.pathname);
-    
+
     return (
         <Layout currentPageName={currentPage}>
-            <Routes>            
-                
-                    <Route path="/" element={<Home />} />
-                
-                
-                <Route path="/Home" element={<Home />} />
-                
-                <Route path="/Map" element={<Map />} />
-                
-                <Route path="/Location" element={<Location />} />
-                
-                <Route path="/Search" element={<Search />} />
-                
-                <Route path="/AccessDenied" element={<AccessDenied />} />
-                
-                <Route path="/AdminDashboard" element={<AdminDashboard />} />
-                
-                <Route path="/AdminLocations" element={<AdminLocations />} />
-                
-                <Route path="/AdminEditLocation" element={<AdminEditLocation />} />
-                
-                <Route path="/AdminUsers" element={<AdminUsers />} />
-                
-                <Route path="/About" element={<About />} />
-                
-                <Route path="/Privacy" element={<Privacy />} />
-                
-                <Route path="/Contact" element={<Contact />} />
-                
-                <Route path="/Route" element={<RoutePage />} />
-                
-                <Route path="/AdminStats" element={<AdminStats />} />
-
-                <Route path="/Login" element={<Login />} />
-
-                <Route path="/resetpassword" element={<ResetPassword />} />
-
+            <Routes>
+                <Route path="/" element={<Home />} />
+                {Object.entries(PAGES).map(([name, Component]) => (
+                    <Route key={name} path={createPageUrl(name)} element={<Component />} />
+                ))}
             </Routes>
         </Layout>
     );
@@ -134,8 +104,12 @@ function PagesContent() {
 
 export default function Pages() {
     return (
-        <Router>
-            <PagesContent />
-        </Router>
+        <AuthProvider>
+            <LanguageProvider>
+                <Router>
+                    <PagesContent />
+                </Router>
+            </LanguageProvider>
+        </AuthProvider>
     );
 }

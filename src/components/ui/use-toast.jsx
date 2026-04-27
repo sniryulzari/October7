@@ -2,7 +2,8 @@
 import { useState, useEffect, createContext, useContext } from "react";
 
 const TOAST_LIMIT = 20;
-const TOAST_REMOVE_DELAY = 1000000;
+const TOAST_REMOVE_DELAY = 600; // ms after dismiss before removing from DOM (animation)
+const TOAST_DURATION = 4000;   // ms until auto-dismiss
 
 const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
@@ -133,6 +134,8 @@ function toast({ ...props }) {
       },
     },
   });
+
+  setTimeout(dismiss, TOAST_DURATION);
 
   return {
     id,

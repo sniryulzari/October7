@@ -65,6 +65,52 @@ export const Location = {
       .eq('id', id);
     if (error) throw error;
   },
+
+  async incrementViewCount(id) {
+    const { error } = await supabase.rpc('increment_view_count', { location_id: id });
+    if (error) throw error;
+  },
+
+  async updateAudioStats(id, listeningTime, audioDuration) {
+    const { error } = await supabase.rpc('update_audio_stats', {
+      location_id: id,
+      listening_time: listeningTime,
+      audio_duration: audioDuration,
+    });
+    if (error) throw error;
+  },
+
+  async incrementField(id, fieldName) {
+    const { error } = await supabase.rpc('increment_field', {
+      location_id: id,
+      field_name: fieldName,
+    });
+    if (error) throw error;
+  },
+
+  async incrementNavigationClicks(id) {
+    return this.incrementField(id, 'navigation_clicks');
+  },
+
+  async incrementShareCount(id) {
+    return this.incrementField(id, 'share_count');
+  },
+
+  async incrementVideoPlays(id) {
+    return this.incrementField(id, 'video_plays');
+  },
+
+  async incrementLanguageView(id, lang) {
+    return this.incrementField(id, lang === 'en' ? 'views_en' : 'views_he');
+  },
+
+  async updateLastViewedAt(id) {
+    const { error } = await supabase
+      .from('locations')
+      .update({ last_viewed_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
+  },
 };
 
 export const User = {
@@ -101,17 +147,18 @@ export const User = {
   },
 
   async update(id, updates) {
-    if (updates.role !== undefined) {
+    const { role, ...profileUpdates } = updates;
+    if (role !== undefined) {
       const { error } = await supabase.rpc('set_user_role', {
         target_user_id: id,
-        new_role: updates.role,
+        new_role: role,
       });
       if (error) throw error;
-      return;
     }
+    if (Object.keys(profileUpdates).length === 0) return;
     const { data, error } = await supabase
       .from('profiles')
-      .update(updates)
+      .update(profileUpdates)
       .eq('id', id)
       .select();
     if (error) throw error;
