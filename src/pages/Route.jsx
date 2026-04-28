@@ -472,7 +472,7 @@ export default function RoutePage() {
       <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-[#1D4E8F]" />
-          <p className="text-[#6B7280]">{t('route.loadingLocations')}</p>
+          <p className="text-[#555E6D]">{t('route.loadingLocations')}</p>
         </div>
       </div>
     );
@@ -496,7 +496,7 @@ export default function RoutePage() {
                 </div>
                 <h1 className="text-3xl font-bold text-[#1A1A1A]">{t('route.title')}</h1>
               </div>
-              <p className="text-[#6B7280] text-base mr-[60px]">
+              <p className="text-[#555E6D] text-base mr-[60px]">
                 {locationPermission === 'granted' && inGazaEnvelope(userLocation.lat, userLocation.lng)
                   ? t('route.inGazaEnvelope') : t('route.fromSderot')}
               </p>
@@ -504,7 +504,7 @@ export default function RoutePage() {
 
             {/* Stats */}
             {routeLocations.length > 0 && (
-              <div className="flex flex-wrap gap-4 text-sm text-[#6B7280] lg:justify-end">
+              <div className="flex flex-wrap gap-4 text-sm text-[#555E6D] lg:justify-end">
                 <div className="flex items-center gap-1.5">
                   <MapPin className="w-4 h-4 text-[#1D4E8F]" />
                   <span>{routeLocations.length} {t('route.stops')}</span>
@@ -565,7 +565,7 @@ export default function RoutePage() {
                       }`}>
                       <span className={`w-2 h-2 rounded-full shrink-0 ${active ? 'bg-white' : dot}`} />
                       {t(labelKey)}
-                      {descKey && <span className={`text-xs ${active ? 'text-blue-200' : 'text-[#6B7280]'}`}> — {t(descKey)}</span>}
+                      {descKey && <span className={`text-xs ${active ? 'text-blue-200' : 'text-[#555E6D]'}`}> — {t(descKey)}</span>}
                     </button>
                   );
                 })}
@@ -575,13 +575,13 @@ export default function RoutePage() {
               {routeMode === 'custom' && (
                 <div className="mt-4 max-w-sm">
                   <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-[#6B7280]">{t('route.mode.budgetLabel')}</span>
+                    <span className="text-[#555E6D]">{t('route.mode.budgetLabel')}</span>
                     <span className="font-semibold text-[#1D4E8F]">{hoursBudget} {t('route.mode.hours')}</span>
                   </div>
                   <input type="range" min={2} max={9} step={0.5} value={hoursBudget}
                     onChange={e => applyMode('custom', parseFloat(e.target.value))}
                     className="w-full accent-[#1D4E8F] cursor-pointer" />
-                  <div className="flex justify-between text-xs text-[#6B7280] mt-1">
+                  <div className="flex justify-between text-xs text-[#555E6D] mt-1">
                     <span>2 {t('route.mode.hours')}</span>
                     <span>9 {t('route.mode.hours')}</span>
                   </div>
@@ -596,7 +596,7 @@ export default function RoutePage() {
               )}
 
               {/* Customization hint */}
-              <p className="mt-3 text-xs text-[#6B7280]">
+              <p className="mt-3 text-xs text-[#555E6D]">
                 {t('route.customizeHint')}
               </p>
             </div>
@@ -605,7 +605,7 @@ export default function RoutePage() {
           {/* Progress bar */}
           {routeLocations.length > 0 && visitedCount > 0 && (
             <div className="mt-5 max-w-lg">
-              <div className="flex justify-between text-xs text-[#6B7280] mb-1">
+              <div className="flex justify-between text-xs text-[#555E6D] mb-1">
                 <span>{t('route.visited')}: {visitedCount} / {routeLocations.length}</span>
                 <span>{Math.round(visitedCount / routeLocations.length * 100)}%</span>
               </div>
@@ -628,7 +628,7 @@ export default function RoutePage() {
               <h2 className="text-xl font-bold text-[#1A1A1A]">{t('route.stopsTitle')}</h2>
               {routeLocations.length < allLocations.length && (
                 <Button variant="ghost" size="sm" onClick={resetRoute}
-                  className="text-xs text-[#6B7280] hover:text-[#1D4E8F] gap-1">
+                  className="text-xs text-[#555E6D] hover:text-[#1D4E8F] gap-1">
                   <RotateCcw className="w-3 h-3" />
                   {t('route.resetRoute')}
                 </Button>
@@ -648,7 +648,7 @@ export default function RoutePage() {
                   {index > 0 && distFromPrev > 0 && (
                     <div className="flex items-center gap-2 px-3 py-0.5">
                       <div className="w-px h-4 bg-[#D0D5DD] mx-[19px]" />
-                      <span className="text-xs text-[#6B7280]">
+                      <span className="text-xs text-[#555E6D]">
                         <Car className="w-3 h-3 inline ml-1" />
                         {Math.round(distFromPrev)} {t('route.km')} — {driveMinutes} {t('route.minutes')} נסיעה
                       </span>
@@ -676,17 +676,17 @@ export default function RoutePage() {
                             <div className="flex items-center gap-0.5 flex-shrink-0">
                               <Button variant="ghost" size="sm" onClick={() => toggleVisited(location.id)}
                                 title={t('route.markVisited')}
-                                className={`p-1 h-auto ${isVisited ? 'text-green-600' : 'text-[#6B7280] hover:text-green-600'}`}>
+                                className={`p-1 h-auto ${isVisited ? 'text-green-600' : 'text-[#555E6D] hover:text-green-600'}`}>
                                 {isVisited ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
                               </Button>
                               <Button variant="ghost" size="sm" onClick={() => removeFromRoute(location.id)}
-                                className="p-1 h-auto text-[#6B7280] hover:text-red-500">
+                                className="p-1 h-auto text-[#555E6D] hover:text-red-500">
                                 <X className="w-4 h-4" />
                               </Button>
                             </div>
                           </div>
 
-                          <p className="text-sm text-[#6B7280] mb-2 leading-relaxed line-clamp-2">
+                          <p className="text-sm text-[#555E6D] mb-2 leading-relaxed line-clamp-2">
                             {locStoryTitle(location) || t('route.defaultStory')}
                           </p>
 
@@ -720,7 +720,7 @@ export default function RoutePage() {
                             ? <Link to={createPageUrl(`Location?id=${location.id}`)} onClick={() => incrementViewCount(location.id)}>
                                 <img src={location.main_image} alt={location.name} className="w-full h-full object-cover hover:opacity-80 transition-opacity" />
                               </Link>
-                            : <div className="w-full h-full flex items-center justify-center"><MapPin className="w-6 h-6 text-[#6B7280]" /></div>
+                            : <div className="w-full h-full flex items-center justify-center"><MapPin className="w-6 h-6 text-[#555E6D]" /></div>
                           }
                         </div>
                       </div>
@@ -735,7 +735,7 @@ export default function RoutePage() {
               <div className="mt-6">
                 <button
                   onClick={() => setShowNotInRoute(v => !v)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-dashed border-[#D0D5DD] hover:border-[#1D4E8F] text-sm text-[#6B7280] hover:text-[#1D4E8F] transition-colors"
+                  className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-dashed border-[#D0D5DD] hover:border-[#1D4E8F] text-sm text-[#555E6D] hover:text-[#1D4E8F] transition-colors"
                 >
                   <span className="flex items-center gap-2">
                     <Plus className="w-4 h-4" />
@@ -746,7 +746,7 @@ export default function RoutePage() {
 
                 {showNotInRoute && (
                   <div className="mt-2 space-y-2">
-                    <p className="text-xs text-[#6B7280] px-1 pb-1">{t('route.notInRouteHint')}</p>
+                    <p className="text-xs text-[#555E6D] px-1 pb-1">{t('route.notInRouteHint')}</p>
                     {notInRoute.map(location => (
                       <Card key={location.id} className="bg-white border-0 shadow-sm opacity-80 hover:opacity-100 transition-opacity">
                         <CardContent className="p-3">
@@ -754,12 +754,12 @@ export default function RoutePage() {
                             <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-[#F2F2F2]">
                               {location.main_image
                                 ? <img src={location.main_image} alt={location.name} className="w-full h-full object-cover" />
-                                : <div className="w-full h-full flex items-center justify-center"><MapPin className="w-4 h-4 text-[#6B7280]" /></div>
+                                : <div className="w-full h-full flex items-center justify-center"><MapPin className="w-4 h-4 text-[#555E6D]" /></div>
                               }
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium text-[#1A1A1A] truncate">{locName(location)}</p>
-                              <p className="text-xs text-[#6B7280] truncate">{locStoryTitle(location) || location.category}</p>
+                              <p className="text-xs text-[#555E6D] truncate">{locStoryTitle(location) || location.category}</p>
                             </div>
                             <Button size="sm" onClick={() => addToRoute(location)}
                               className="bg-[#1D4E8F] hover:bg-[#2560B0] text-white text-xs h-8 shrink-0 gap-1">
@@ -785,7 +785,7 @@ export default function RoutePage() {
                   {!mapReady && (
                     <div className="h-full flex flex-col items-center justify-center gap-3">
                       <div className="w-10 h-10 border-4 border-[#1D4E8F] border-t-transparent rounded-full animate-spin" />
-                      <p className="text-[#6B7280] text-sm">טוען מפה...</p>
+                      <p className="text-[#555E6D] text-sm">טוען מפה...</p>
                     </div>
                   )}
                 </div>

@@ -32,6 +32,10 @@ import Login from "./Login";
 
 import ResetPassword from "./ResetPassword";
 
+import AccessibilityStatement from "./AccessibilityStatement";
+
+import Terms from "./Terms";
+
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 import { LanguageProvider } from '../utils/language';
 import { AuthProvider } from '../api/AuthContext';
@@ -70,6 +74,10 @@ const PAGES = {
     Login: Login,
 
     ResetPassword: ResetPassword,
+
+    AccessibilityStatement: AccessibilityStatement,
+
+    Terms: Terms,
 
 }
 

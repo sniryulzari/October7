@@ -182,7 +182,7 @@ export default function SearchPage() {
           <h1 className="text-3xl md:text-4xl font-bold text-[#1A1A1A] mb-4">
             {t('search.title')}
           </h1>
-          <p className="text-lg text-[#6B7280] max-w-2xl mx-auto">
+          <p className="text-lg text-[#555E6D] max-w-2xl mx-auto">
             {t('search.subtitle')}
           </p>
         </div>
@@ -221,17 +221,19 @@ export default function SearchPage() {
               <div className="space-y-4">
                 {/* Search Bar */}
                 <div className="relative">
-                  <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#6B7280] w-5 h-5" />
+                  <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#555E6D] w-5 h-5" aria-hidden="true" />
                   <Input
                     placeholder={t('search.placeholder')}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
+                    aria-label={t('search.placeholder')}
+                    type="search"
                     className="pr-12 text-lg py-6 border-[#F2F2F2] focus:border-[#1D4E8F] text-[#1A1A1A]"
                   />
                 </div>
 
                 {/* Category Filter Buttons */}
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2" role="group" aria-label="סינון לפי קטגוריה">
                   {[
                     { value: 'הכל', label: t('search.allTypes') },
                     { value: 'יישוב', label: t('search.townPlural') },
@@ -242,6 +244,7 @@ export default function SearchPage() {
                     <button
                       key={value}
                       onClick={() => setCategoryFilter(value)}
+                      aria-pressed={categoryFilter === value}
                       className={`px-5 py-3 rounded-full text-base font-medium transition-all border-2 touch-manipulation select-none
                         ${categoryFilter === value
                           ? 'bg-[#1D4E8F] text-white border-[#1D4E8F] shadow-md'
@@ -255,7 +258,7 @@ export default function SearchPage() {
 
                 {/* Sort */}
                 <div className="flex items-center gap-3 flex-wrap">
-                  <span className="text-sm text-[#6B7280]">{t('search.sort')}</span>
+                  <span className="text-sm text-[#555E6D]">{t('search.sort')}</span>
                   <Select value={sortBy} onValueChange={setSortBy}>
                     <SelectTrigger className="w-44 border-[#F2F2F2] focus:border-[#1D4E8F] [&>span]:text-right">
                       <SelectValue />
@@ -285,7 +288,7 @@ export default function SearchPage() {
             </h2>
 
             {searchTerm && (
-              <div className="text-sm text-[#6B7280]">
+              <div className="text-sm text-[#555E6D]">
                 {t('search.resultsFor')} <span className="font-semibold text-[#2560B0]">&ldquo;{searchTerm}&rdquo;</span>
               </div>
             )}
@@ -313,7 +316,7 @@ export default function SearchPage() {
             <h3 className="text-xl font-semibold text-[#1A1A1A] mb-2">
               {t('search.cannotLoad')}
             </h3>
-            <p className="text-[#6B7280] mb-6">{t('search.tryLater')}</p>
+            <p className="text-[#555E6D] mb-6">{t('search.tryLater')}</p>
             <Button
               onClick={retryLoad}
               className="bg-[#1D4E8F] hover:bg-[#2560B0] text-white"
@@ -324,12 +327,12 @@ export default function SearchPage() {
         ) : filteredLocations.length === 0 && locations.length > 0 ? (
           <div className="text-center py-16">
             <div className="w-24 h-24 bg-[#F2F2F2] rounded-full flex items-center justify-center mx-auto mb-6">
-              <Search className="w-12 h-12 text-[#6B7280]" />
+              <Search className="w-12 h-12 text-[#555E6D]" />
             </div>
             <h3 className="text-xl font-semibold text-[#1A1A1A] mb-2">
               {t('search.noResults')}
             </h3>
-            <p className="text-[#6B7280] mb-6">{t('search.noResultsHint')}</p>
+            <p className="text-[#555E6D] mb-6">{t('search.noResultsHint')}</p>
             <Button
               variant="outline"
               className="border-[#1D4E8F] text-[#1D4E8F] hover:bg-[#F2F2F2]"
@@ -356,7 +359,7 @@ export default function SearchPage() {
                       />
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-[#1E3A5F] to-[#2560B0] flex flex-col items-center justify-center gap-2">
-                        <MapPin className="w-10 h-10 text-white/40" />
+                        <MapPin className="w-10 h-10 text-white/40" aria-hidden="true" />
                         <span className="text-white/70 text-sm font-medium text-center px-6 line-clamp-2">{location.name}</span>
                       </div>
                     )}
@@ -383,18 +386,18 @@ export default function SearchPage() {
                   </Link>
 
                   {/* Category */}
-                  <p className="text-xs text-[#9CA3AF] mb-3">{t(`category.${location.category}`)}</p>
+                  <p className="text-xs text-[#555E6D] mb-3">{t(`category.${location.category}`)}</p>
 
                   {/* Story title */}
                   {locStoryTitle(location) && (
-                    <p className="text-[#6B7280] text-sm font-medium mb-2 line-clamp-1">
+                    <p className="text-[#555E6D] text-sm font-medium mb-2 line-clamp-1">
                       {locStoryTitle(location)}
                     </p>
                   )}
 
                   {/* Story excerpt */}
                   {locStoryContent(location) && (
-                    <p className="text-[#9CA3AF] text-sm mb-3 line-clamp-2 leading-relaxed">
+                    <p className="text-[#555E6D] text-sm mb-3 line-clamp-2 leading-relaxed">
                       {locStoryContent(location)}
                     </p>
                   )}
@@ -403,19 +406,19 @@ export default function SearchPage() {
                   {(location.audio_file || location.gallery?.length > 0 || location.videos?.length > 0) && (
                     <div className="flex items-center gap-2 mb-4">
                       {location.audio_file && (
-                        <span className="flex items-center gap-1 text-xs text-[#6B7280] bg-[#F2F2F2] px-2 py-1 rounded-full">
+                        <span className="flex items-center gap-1 text-xs text-[#555E6D] bg-[#F2F2F2] px-2 py-1 rounded-full">
                           <Headphones className="w-3 h-3" />
                           {t('search.audio')}
                         </span>
                       )}
                       {location.gallery?.length > 0 && (
-                        <span className="flex items-center gap-1 text-xs text-[#6B7280] bg-[#F2F2F2] px-2 py-1 rounded-full">
+                        <span className="flex items-center gap-1 text-xs text-[#555E6D] bg-[#F2F2F2] px-2 py-1 rounded-full">
                           <Camera className="w-3 h-3" />
                           {location.gallery.length}
                         </span>
                       )}
                       {location.videos?.length > 0 && (
-                        <span className="flex items-center gap-1 text-xs text-[#6B7280] bg-[#F2F2F2] px-2 py-1 rounded-full">
+                        <span className="flex items-center gap-1 text-xs text-[#555E6D] bg-[#F2F2F2] px-2 py-1 rounded-full">
                           <Video className="w-3 h-3" />
                           {location.videos.length}
                         </span>

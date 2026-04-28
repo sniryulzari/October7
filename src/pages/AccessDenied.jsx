@@ -20,7 +20,7 @@ export default function AccessDenied() {
         <h1 className="text-3xl font-bold text-[#1A1A1A] mb-2">
           הגישה נדחתה
         </h1>
-        <p className="text-[#6B7280] mb-8">
+        <p className="text-[#555E6D] mb-8">
           אין לך את ההרשאות המתאימות לצפייה בדף זה.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">

@@ -59,7 +59,7 @@ export default function Home() {
       <section className="bg-[#0C1C2E] text-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-28 lg:py-44">
           <div className="text-center space-y-8">
-            <p className="text-xs font-semibold tracking-[0.35em] text-white/40 uppercase">
+            <p className="text-xs font-semibold tracking-[0.35em] text-white/60 uppercase">
               7.10.2023
             </p>
 
@@ -98,19 +98,19 @@ export default function Home() {
             <div>
               <p className="text-xs font-bold tracking-[0.3em] text-[#1D4E8F]/40 mb-4">01</p>
               <h3 className="text-xl font-bold text-[#1A1A1A] mb-2">{t('home.step1Title')}</h3>
-              <p className="text-[#6B7280] leading-relaxed">{t('home.step1Desc')}</p>
+              <p className="text-[#555E6D] leading-relaxed">{t('home.step1Desc')}</p>
             </div>
 
             <div>
               <p className="text-xs font-bold tracking-[0.3em] text-[#1D4E8F]/40 mb-4">02</p>
               <h3 className="text-xl font-bold text-[#1A1A1A] mb-2">{t('home.step2Title')}</h3>
-              <p className="text-[#6B7280] leading-relaxed">{t('home.step2Desc')}</p>
+              <p className="text-[#555E6D] leading-relaxed">{t('home.step2Desc')}</p>
             </div>
 
             <div>
               <p className="text-xs font-bold tracking-[0.3em] text-[#1D4E8F]/40 mb-4">03</p>
               <h3 className="text-xl font-bold text-[#1A1A1A] mb-2">{t('home.step3Title')}</h3>
-              <p className="text-[#6B7280] leading-relaxed">{t('home.step3Desc')}</p>
+              <p className="text-[#555E6D] leading-relaxed">{t('home.step3Desc')}</p>
             </div>
           </div>
         </div>
@@ -123,8 +123,8 @@ export default function Home() {
             <div className="flex flex-col lg:flex-row items-center gap-8">
               <div className="flex-1">
                 <h2 className="text-3xl font-bold text-[#1A1A1A] mb-4">{t('home.memorialRouteTitle')}</h2>
-                <p className="text-xl text-[#6B7280] mb-6">{t('home.memorialRouteDesc')}</p>
-                <div className="flex items-center gap-4 text-[#6B7280] mb-6">
+                <p className="text-xl text-[#555E6D] mb-6">{t('home.memorialRouteDesc')}</p>
+                <div className="flex items-center gap-4 text-[#555E6D] mb-6">
                   <div className="flex items-center gap-2">
                     <Clock className="w-5 h-5" />
                     <span>{t('home.duration')}</span>
@@ -151,10 +151,10 @@ export default function Home() {
                         <div className="w-8 h-8 bg-[#F2F2F2] rounded-full flex items-center justify-center flex-shrink-0">
                           <span className="text-sm font-semibold text-[#1D4E8F]">{index + 1}</span>
                         </div>
-                        <span className="text-[#6B7280]">{locName(location)}</span>
+                        <span className="text-[#555E6D]">{locName(location)}</span>
                       </div>
                     ))}
-                    <div className="text-sm text-[#6B7280] pt-2">{t('home.andMore')}</div>
+                    <div className="text-sm text-[#555E6D] pt-2">{t('home.andMore')}</div>
                   </div>
                 </div>
               </div>
@@ -170,7 +170,7 @@ export default function Home() {
             <h2 className="text-3xl font-bold text-[#1A1A1A] mb-4">
               {userLocation ? t('home.nearbyTitle') : t('home.recommendedTitle')}
             </h2>
-            <p className="text-xl text-[#6B7280]">{t('home.nearbySubtitle')}</p>
+            <p className="text-xl text-[#555E6D]">{t('home.nearbySubtitle')}</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -189,11 +189,11 @@ export default function Home() {
                     />
                   ) : (
                     <div className="w-full h-full bg-[#F2F2F2] flex items-center justify-center">
-                      <MapPin className="w-12 h-12 text-[#6B7280]" />
+                      <MapPin className="w-12 h-12 text-[#555E6D]" />
                     </div>
                   )}
                   {distanceKm !== null && (
-                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-sm font-medium text-[#6B7280]">
+                    <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full text-sm font-medium text-[#555E6D]">
                       {distanceKm} ק"מ
                     </div>
                   )}
@@ -201,7 +201,7 @@ export default function Home() {
                 
                 <CardContent className="p-6">
                   <h3 className="text-xl font-bold text-[#1A1A1A] mb-2">{locName(location)}</h3>
-                  <p className="text-[#6B7280] text-base mb-4 line-clamp-2">
+                  <p className="text-[#555E6D] text-base mb-4 line-clamp-2">
                     {locStoryTitle(location) || t('home.defaultStory')}
                   </p>
 

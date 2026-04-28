@@ -50,7 +50,7 @@ function makeInfoContent(location, color, category, dist) {
     <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 280px; min-width: 220px;">
       ${location.main_image ? `
         <div style="margin: -8px -8px 10px; overflow: hidden; height: 130px; border-radius: 8px 8px 0 0;">
-          <img src="${location.main_image}" style="width:100%;height:130px;object-fit:cover;" />
+          <img src="${location.main_image}" alt="${location.name}" style="width:100%;height:130px;object-fit:cover;" />
         </div>` : ''}
       <h3 style="margin:0 0 6px;font-size:17px;font-weight:700;color:#1A1A1A;">${location.name}</h3>
       <span style="background:${color};color:white;padding:2px 10px;border-radius:10px;font-size:12px;">${category}</span>
@@ -353,19 +353,22 @@ export default function Map() {
             {/* Search row */}
             <div className="flex gap-2 items-center">
               <div className="relative flex-1">
-                <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5C5750] w-5 h-5" />
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5C5750] w-5 h-5" aria-hidden="true" />
                 <Input
                   placeholder="חפש מקום..."
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
+                  aria-label="חיפוש מקום במפה"
+                  type="search"
                   className="pr-12 text-base py-5 border-[#EDE9E3] focus:border-[#1D4E8F] text-[#1A1A1A]"
                 />
                 {searchTerm && (
                   <button
                     onClick={() => setSearchTerm("")}
+                    aria-label="נקה חיפוש"
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5C5750] hover:text-[#1A1A1A]"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-4 h-4" aria-hidden="true" />
                   </button>
                 )}
               </div>
@@ -474,10 +477,12 @@ export default function Map() {
                           : null;
                         const color = categoryConfig[location.category]?.color || "#6B7280";
                         return (
-                          <div
+                          <button
                             key={location.id}
                             onClick={() => focusOnLocation(location)}
-                            className={`p-4 cursor-pointer hover:bg-[#F5F3F0] transition-colors border-r-4 ${
+                            aria-label={`${location.name}${dist ? `, ${dist}` : ''}`}
+                            aria-pressed={selectedId === location.id}
+                            className={`w-full text-right p-4 cursor-pointer hover:bg-[#F5F3F0] transition-colors border-r-4 ${
                               selectedId === location.id
                                 ? 'bg-blue-50 border-[#1D4E8F]'
                                 : 'border-transparent'
@@ -506,7 +511,7 @@ export default function Map() {
                                 </div>
                                 <div className="flex items-center justify-between mt-1.5">
                                   {dist
-                                    ? <span className="text-xs text-[#888]">📍 {dist}</span>
+                                    ? <span className="text-xs text-[#555E6D]">📍 {dist}</span>
                                     : <span />
                                   }
                                   {selectedId === location.id && (
@@ -521,7 +526,7 @@ export default function Map() {
                                 </div>
                               </div>
                             </div>
-                          </div>
+                          </button>
                         );
                       })}
 

@@ -48,7 +48,7 @@ export default function AboutPage() {
               </h2>
             </div>
             
-            <div className="prose prose-lg max-w-none text-[#6B7280] leading-relaxed space-y-4">
+            <div className="prose prose-lg max-w-none text-[#555E6D] leading-relaxed space-y-4">
               <p className="text-lg sm:text-xl leading-relaxed">
                 האפליקציה נועדה לאפשר למבקרים באזור עוטף עזה להכיר ולהבין את האירועים הקשים 
                 שהתרחשו במקומות המרכזיים במהלך הטבח ב־7 באוקטובר 2023.
@@ -75,7 +75,7 @@ export default function AboutPage() {
                 </div>
                 <div>
                   <h3 className="text-xl font-semibold text-[#1A1A1A] mb-2">הנגשת המידע</h3>
-                  <p className="text-[#6B7280] leading-relaxed">
+                  <p className="text-[#555E6D] leading-relaxed">
                     לאפשר לכל אדם לשמוע את הסיפור של המקום בו הוא נמצא באופן נגיש ומיידי.
                   </p>
                 </div>
@@ -87,7 +87,7 @@ export default function AboutPage() {
                 </div>
                 <div>
                   <h3 className="text-xl font-semibold text-[#1A1A1A] mb-2">שימור הזיכרון</h3>
-                  <p className="text-[#6B7280] leading-relaxed">
+                  <p className="text-[#555E6D] leading-relaxed">
                     שמירה על עדויות, תמונות, סרטונים ומסמכים חשובים לדורות הבאים.
                   </p>
                 </div>
@@ -99,7 +99,7 @@ export default function AboutPage() {
                 </div>
                 <div>
                   <h3 className="text-xl font-semibold text-[#1A1A1A] mb-2">הנחיית מסלול</h3>
-                  <p className="text-[#6B7280] leading-relaxed">
+                  <p className="text-[#555E6D] leading-relaxed">
                     הצעת מסלול מסודר ומותאם אישית למטיילים בין האתרים השונים.
                   </p>
                 </div>
@@ -111,7 +111,7 @@ export default function AboutPage() {
                 </div>
                 <div>
                   <h3 className="text-xl font-semibold text-[#1A1A1A] mb-2">חיבור קהילתי</h3>
-                  <p className="text-[#6B7280] leading-relaxed">
+                  <p className="text-[#555E6D] leading-relaxed">
                     יצירת גשר בין המבקרים לבין הסיפורים האישיים של האנשים שהיו שם.
                   </p>
                 </div>
@@ -133,7 +133,7 @@ export default function AboutPage() {
                   <span className="text-2xl font-bold text-white">1</span>
                 </div>
                 <h3 className="text-lg font-semibold text-[#1A1A1A] mb-2">סרוק את הברקוד</h3>
-                <p className="text-[#6B7280] text-sm leading-relaxed">
+                <p className="text-[#555E6D] text-sm leading-relaxed">
                   מצא את קוד ה-QR במקום בו אתה נמצא וסרוק אותו עם הטלפון
                 </p>
               </div>
@@ -143,7 +143,7 @@ export default function AboutPage() {
                   <span className="text-2xl font-bold text-white">2</span>
                 </div>
                 <h3 className="text-lg font-semibold text-[#1A1A1A] mb-2">קבל דף ייעודי</h3>
-                <p className="text-[#6B7280] text-sm leading-relaxed">
+                <p className="text-[#555E6D] text-sm leading-relaxed">
                   תגיע לדף המקום עם נגן אודיו, תמונות וכל המידע הרלוונטי
                 </p>
               </div>
@@ -153,7 +153,7 @@ export default function AboutPage() {
                   <span className="text-2xl font-bold text-white">3</span>
                 </div>
                 <h3 className="text-lg font-semibold text-[#1A1A1A] mb-2">האזן וגלה</h3>
-                <p className="text-[#6B7280] text-sm leading-relaxed">
+                <p className="text-[#555E6D] text-sm leading-relaxed">
                   האזן לסיפור המקום וצפה בתמונות ובסרטונים מהיום ההוא
                 </p>
               </div>
@@ -168,7 +168,7 @@ export default function AboutPage() {
               מי אנחנו
             </h2>
             
-            <div className="prose prose-lg max-w-none text-[#6B7280] leading-relaxed space-y-4">
+            <div className="prose prose-lg max-w-none text-[#555E6D] leading-relaxed space-y-4">
               <p className="text-lg leading-relaxed">
                 פרויקט "זיכרון 7.10" הוא יוזמה עצמאית שנוצרה מתוך הרצון לשמר ולהנציח את זכר 
                 הקורבנות ולספר את סיפורם של המקומות שנפגעו באותו יום נורא.
@@ -188,7 +188,7 @@ export default function AboutPage() {
                 <Shield className="w-6 h-6 text-[#1D4E8F]" />
                 <h3 className="text-lg font-semibold text-[#1A1A1A]">התחייבותנו</h3>
               </div>
-              <p className="text-[#6B7280] leading-relaxed">
+              <p className="text-[#555E6D] leading-relaxed">
                 אנו מתחייבים לשמור על דיוק המידע, לכבד את זכר הנפגעים ולהציג את התכנים 
                 בצורה רגישה ומכבדת. כל התכנים נבדקים ומאושרים על ידי גורמים מוסמכים.
               </p>
@@ -213,7 +213,7 @@ export default function AboutPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-[#1A1A1A]">מדיניות פרטיות</h3>
-                  <p className="text-sm text-[#6B7280]">איך אנו שומרים על הפרטיות שלך</p>
+                  <p className="text-sm text-[#555E6D]">איך אנו שומרים על הפרטיות שלך</p>
                 </div>
               </Link>
               
@@ -226,7 +226,7 @@ export default function AboutPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-[#1A1A1A]">יצירת קשר</h3>
-                  <p className="text-sm text-[#6B7280]">יש לך שאלות? צור עמנו קשר</p>
+                  <p className="text-sm text-[#555E6D]">יש לך שאלות? צור עמנו קשר</p>
                 </div>
               </Link>
             </div>

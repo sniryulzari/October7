@@ -53,7 +53,7 @@ ${formData.message}
       setIsSubmitted(true);
       setFormData({ name: '', email: '', subject: '', message: '' });
     } catch (error) {
-      console.error('Error sending email:', error);
+      console.error('Error sending email:', error?.message ?? error);
       alert('שגיאה בשליחת ההודעה. אנא נסו שוב.');
     }
 
@@ -66,7 +66,7 @@ ${formData.message}
         <div className="max-w-md mx-auto text-center">
           <CheckCircle className="w-16 h-16 text-[#1D4E8F] mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-[#1A1A1A] mb-2">ההודעה נשלחה בהצלחה</h1>
-          <p className="text-[#6B7280] mb-6">תודה על פנייתכם. נחזור אליכם בהקדם האפשרי.</p>
+          <p className="text-[#555E6D] mb-6">תודה על פנייתכם. נחזור אליכם בהקדם האפשרי.</p>
           <Button onClick={() => setIsSubmitted(false)} className="bg-[#1D4E8F] hover:bg-[#2560B0]">שלח הודעה נוספת</Button>
         </div>
       </div>
@@ -83,7 +83,7 @@ ${formData.message}
             </div>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-[#1A1A1A] mb-4">צור קשר</h1>
-          <p className="text-lg text-[#6B7280]">נשמח לעזור ולענות על שאלותיכם</p>
+          <p className="text-lg text-[#555E6D]">נשמח לעזור ולענות על שאלותיכם</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -98,7 +98,7 @@ ${formData.message}
                   <Mail className="w-5 h-5 text-[#1D4E8F] mt-1" />
                   <div>
                     <p className="font-medium text-[#1A1A1A]">אימייל</p>
-                    <p className="text-[#6B7280]">sniryulzari@gmail.com</p>
+                    <p className="text-[#555E6D]">sniryulzari@gmail.com</p>
                   </div>
                 </div>
 
@@ -106,7 +106,7 @@ ${formData.message}
                   <MapPin className="w-5 h-5 text-[#1D4E8F] mt-1" />
                   <div>
                     <p className="font-medium text-[#1A1A1A]">מיקום</p>
-                    <p className="text-[#6B7280]">ישראל</p>
+                    <p className="text-[#555E6D]">ישראל</p>
                   </div>
                 </div>
               </CardContent>
@@ -148,9 +148,9 @@ ${formData.message}
                   </div>
 
                   <div>
-                    <Label className="block mb-2 text-[#1A1A1A]">נושא הפנייה</Label>
+                    <Label htmlFor="subject" className="block mb-2 text-[#1A1A1A]">נושא הפנייה</Label>
                     <Select value={formData.subject} onValueChange={handleSubjectChange}>
-                      <SelectTrigger className="border-[#F2F2F2] focus:border-[#1D4E8F]">
+                      <SelectTrigger id="subject" aria-label="נושא הפנייה" className="border-[#F2F2F2] focus:border-[#1D4E8F]">
                         <SelectValue placeholder="בחרו נושא" />
                       </SelectTrigger>
                       <SelectContent className="bg-white border-[#F2F2F2]">
