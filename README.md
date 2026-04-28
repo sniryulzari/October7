@@ -1,20 +1,18 @@
-# Base44 App
+# זיכרון 7.10
 
+אפליקציית אנדרטה לתיעוד אתרי הטבח של ה-7 באוקטובר 2023 באזור עוטף עזה.
 
-This app was created automatically by Base44.
-It's a Vite+React app that communicates with the Base44 API.
+מדבקות QR קוד ממוקמות באתרים פיזיים ומובילות מבקרים לדפי מיקום עם שמע, תמונות וסרטונים.
 
-## Running the app
+## הפעלה מקומית
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Building the app
+## בנייה לייצור
 
 ```bash
 npm run build
 ```
-
-For more information and support, please contact Base44 support at app@base44.com.

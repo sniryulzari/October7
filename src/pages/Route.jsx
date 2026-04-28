@@ -188,7 +188,7 @@ function makePopupHTML(location, index, recommendedTime) {
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function RoutePage() {
-  const { t, locName, locStoryTitle } = useLanguage();
+  const { t, locName, locStoryTitle, isRTL } = useLanguage();
 
   const [allLocations, setAllLocations]     = useState([]);
   const [routeLocations, setRouteLocations] = useState([]);
@@ -227,7 +227,8 @@ export default function RoutePage() {
     s.src = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
     s.onload = () => {
       window.maplibregl.setRTLTextPlugin(
-        'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js', null, true
+        'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js',
+        false
       );
       setScriptLoaded(true);
     };
@@ -262,7 +263,7 @@ export default function RoutePage() {
       setMapReady(true);
     });
     return () => { map.remove(); mapRef.current = null; };
-  }, [scriptLoaded]);
+  }, [scriptLoaded, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Data loading ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -431,9 +432,12 @@ export default function RoutePage() {
     routeLocations.forEach((location, index) => {
       if (!location.coordinates) return;
       const isVisited = visitedLocations.includes(location.id);
+      const color = isVisited ? '#22C55E' : '#1D4E8F';
+      const name = locName(location);
+      const textDir = isRTL ? 'rtl' : 'ltr';
       const el = document.createElement('div');
-      el.style.cssText = 'cursor:pointer;';
-      el.innerHTML = `<div style="background:${isVisited ? '#22C55E' : '#1D4E8F'};color:white;width:32px;height:32px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;font-family:Arial,sans-serif;">${index + 1}</div>`;
+      el.style.cssText = 'cursor:pointer;position:relative;width:32px;height:32px;';
+      el.innerHTML = `<div style="background:${color};color:white;width:32px;height:32px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;font-family:Arial,sans-serif;">${index + 1}</div><div style="position:absolute;top:36px;left:50%;transform:translateX(-50%);background:${color};color:white;font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.4);font-family:Arial,sans-serif;max-width:110px;overflow:hidden;text-overflow:ellipsis;direction:${textDir};">${name}</div>`;
       el.addEventListener('click', () => {
         popupRef.current
           .setLngLat([location.coordinates.lng, location.coordinates.lat])

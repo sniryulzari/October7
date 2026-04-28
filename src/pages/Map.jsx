@@ -109,8 +109,7 @@ export default function Map() {
     s.onload = () => {
       window.maplibregl.setRTLTextPlugin(
         'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js',
-        null,
-        true
+        false
       );
       setScriptLoaded(true);
     };
