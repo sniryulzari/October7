@@ -45,10 +45,9 @@ ${formData.message}
       `;
 
       await SendEmail({
-        to: 'sniryulzari@gmail.com',
         subject: `צור קשר - ${formData.subject}`,
         body: emailContent,
-        from_name: 'זיכרון 7 באוקטובר'
+        reply_to: formData.email,
       });
 
       setIsSubmitted(true);

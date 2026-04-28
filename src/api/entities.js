@@ -111,6 +111,25 @@ export const Location = {
       .eq('id', id);
     if (error) throw error;
   },
+
+  async getByContributor(userId) {
+    const { data, error } = await supabase
+      .from('locations')
+      .select('*')
+      .contains('allowed_contributors', [userId])
+      .order('created_date', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  async manageContributor(locationId, contributorId, action) {
+    const { error } = await supabase.rpc('manage_location_contributor', {
+      p_location_id: locationId,
+      p_contributor_id: contributorId,
+      p_action: action,
+    });
+    if (error) throw error;
+  },
 };
 
 export const User = {
@@ -146,6 +165,15 @@ export const User = {
     return data;
   },
 
+  async listContributors() {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', 'contributor');
+    if (error) throw error;
+    return data;
+  },
+
   async update(id, updates) {
     const { role, ...profileUpdates } = updates;
     if (role !== undefined) {
@@ -163,5 +191,46 @@ export const User = {
       .select();
     if (error) throw error;
     return data?.[0];
+  },
+
+  async invite(email, fullName, role) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-user-action`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ action: 'invite', email, full_name: fullName, role }),
+      }
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to invite user');
+    return data;
+  },
+
+  async deleteUser(userId) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-user-action`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ action: 'delete', userId }),
+      }
+    );
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to delete user');
+  },
+
+  async sendPasswordReset(email) {
+    const redirectTo = `${window.location.origin}/resetpassword`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) throw error;
   },
 };

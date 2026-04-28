@@ -28,8 +28,10 @@ export default function Login() {
       const user = await User.me();
       if (user.role === 'admin') {
         navigate(createPageUrl('AdminDashboard'));
+      } else if (user.role === 'contributor') {
+        navigate(createPageUrl('AdminLocations'));
       } else {
-        setError('אין לך הרשאות מנהל');
+        setError('אין לך הרשאות גישה למערכת');
         await User.logout();
       }
     } catch {

@@ -5,11 +5,21 @@ import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { LayoutDashboard, MapPin, LogOut, ShieldCheck, Loader2, Users, Globe, BarChart2, Menu, X } from 'lucide-react';
 
-const NAV_LINKS = [
-  { name: 'לוח בקרה',      url: createPageUrl("AdminDashboard"),  icon: LayoutDashboard, activeColor: 'text-orange-500' },
-  { name: 'ניהול מקומות',   url: createPageUrl("AdminLocations"),  icon: MapPin,          activeColor: 'text-blue-500'   },
-  { name: 'ניהול משתמשים',  url: createPageUrl("AdminUsers"),      icon: Users,           activeColor: 'text-green-500'  },
-  { name: 'סטטיסטיקות',     url: createPageUrl("AdminStats"),      icon: BarChart2,       activeColor: 'text-purple-500' },
+const ADMIN_NAV = [
+  { name: 'לוח בקרה',     url: createPageUrl('AdminDashboard'), icon: LayoutDashboard, activeColor: 'text-orange-500' },
+  { name: 'ניהול מקומות', url: createPageUrl('AdminLocations'), icon: MapPin,          activeColor: 'text-blue-500'   },
+  { name: 'ניהול משתמשים',url: createPageUrl('AdminUsers'),     icon: Users,           activeColor: 'text-green-500'  },
+  { name: 'סטטיסטיקות',   url: createPageUrl('AdminStats'),     icon: BarChart2,       activeColor: 'text-purple-500' },
+];
+
+const CONTRIBUTOR_NAV = [
+  { name: 'המקומות שלי',  url: createPageUrl('AdminLocations'), icon: MapPin,          activeColor: 'text-blue-500'   },
+];
+
+// Pages a contributor is allowed to visit
+const CONTRIBUTOR_ALLOWED = [
+  createPageUrl('AdminLocations'),
+  createPageUrl('AdminEditLocation'),
 ];
 
 function getInitials(name) {
@@ -20,11 +30,16 @@ function getInitials(name) {
 const AdminSidebar = ({ isOpen, onClose, user }) => {
   const location = useLocation();
   const navigate = useNavigate();
+  const navLinks = user?.role === 'admin' ? ADMIN_NAV : CONTRIBUTOR_NAV;
 
   const handleLogout = async () => {
     await User.logout();
-    navigate(createPageUrl("Home"));
+    navigate(createPageUrl('Home'));
   };
+
+  const roleBadge = user?.role === 'admin'
+    ? <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-semibold">מנהל</span>
+    : <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-semibold">תורם תוכן</span>;
 
   return (
     <>
@@ -61,7 +76,7 @@ const AdminSidebar = ({ isOpen, onClose, user }) => {
 
         {/* Nav */}
         <nav className="flex-grow px-3 py-3 overflow-y-auto space-y-0.5">
-          {NAV_LINKS.map(link => {
+          {navLinks.map(link => {
             const isActive = location.pathname === link.url;
             return (
               <Link
@@ -83,7 +98,7 @@ const AdminSidebar = ({ isOpen, onClose, user }) => {
 
           <div className="pt-4 mt-4 border-t border-gray-100">
             <a
-              href={createPageUrl("Home")}
+              href={createPageUrl('Home')}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-400 hover:bg-gray-50 hover:text-gray-700 transition-all"
@@ -101,9 +116,12 @@ const AdminSidebar = ({ isOpen, onClose, user }) => {
               {getInitials(user?.full_name)}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-gray-900 truncate leading-tight">
-                {user?.full_name || 'מנהל'}
-              </p>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <p className="text-sm font-semibold text-gray-900 truncate leading-tight">
+                  {user?.full_name || 'משתמש'}
+                </p>
+                {roleBadge}
+              </div>
               <p className="text-[11px] text-gray-400 truncate">{user?.email}</p>
             </div>
           </div>
@@ -124,12 +142,19 @@ export default function AdminLayout({ children }) {
   const { user, isLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     if (isLoading) return;
-    if (!user) navigate(createPageUrl("Login"));
-    else if (user.role !== 'admin') navigate(createPageUrl("AccessDenied"));
-  }, [user, isLoading, navigate]);
+    if (!user) {
+      navigate(createPageUrl('Login'));
+    } else if (user.role !== 'admin' && user.role !== 'contributor') {
+      navigate(createPageUrl('AccessDenied'));
+    } else if (user.role === 'contributor') {
+      const allowed = CONTRIBUTOR_ALLOWED.some(p => location.pathname.startsWith(p));
+      if (!allowed) navigate(createPageUrl('AdminLocations'));
+    }
+  }, [user, isLoading, navigate, location.pathname]);
 
   if (isLoading) {
     return (
@@ -142,7 +167,7 @@ export default function AdminLayout({ children }) {
     );
   }
 
-  if (!user || user.role !== 'admin') return null;
+  if (!user || (user.role !== 'admin' && user.role !== 'contributor')) return null;
 
   return (
     <div className="flex min-h-screen bg-[#f0f2f7]" dir="rtl">

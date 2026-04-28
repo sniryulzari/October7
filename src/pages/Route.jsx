@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 import { Location } from "@/api/entities";
 import { useLanguage } from "@/utils/language";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Route, MapPin, Clock, Navigation, Navigation2, Car, AlertTriangle, Info, X, Loader2, CheckCircle2, Circle, Plus, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
+import { Route, MapPin, Clock, Navigation, Navigation2, Car, Info, X, Loader2, CheckCircle2, Circle, Plus, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 
@@ -795,28 +795,6 @@ export default function RoutePage() {
         </div>
       </div>
 
-      {/* ── Important Notes ── */}
-      <section className="py-12 bg-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Card className="bg-yellow-50 border-yellow-200">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-[#1A1A1A]">
-                <AlertTriangle className="w-5 h-5 text-yellow-600" />
-                {t('route.importantNotes')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3 text-[#6B7280]">
-                <p>• <strong>{t('route.note.hoursLabel')}</strong> {t('route.note.hours')}</p>
-                <p>• <strong>{t('route.note.securityLabel')}</strong> {t('route.note.security')}</p>
-                <p>• <strong>{t('route.note.waterLabel')}</strong> {t('route.note.water')}</p>
-                <p>• <strong>{t('route.note.emergencyLabel')}</strong> {t('route.note.emergency')}</p>
-                <p>• <strong>{t('route.note.weatherLabel')}</strong> {t('route.note.weather')}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
     </div>
   );
 }

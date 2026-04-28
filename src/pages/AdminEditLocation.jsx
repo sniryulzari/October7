@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Location } from '@/api/entities';
+import { Location, User } from '@/api/entities';
+import { useAuth } from '@/api/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,7 +17,7 @@ import { UploadFile } from '@/api/integrations';
 import { useToast } from '@/components/ui/use-toast';
 import {
   Save, Loader2, Plus, Trash2, QrCode, MapPin, RotateCcw,
-  Upload, Sparkles, ChevronRight, ArrowRight,
+  Upload, Sparkles, ChevronRight, ArrowRight, UserPlus, X,
 } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 
@@ -83,6 +84,9 @@ function UploadZone({ accept, onChange, disabled, label, hint }) {
 }
 
 export default function EditLocation() {
+  const { user: currentUser } = useAuth();
+  const isContributor = currentUser?.role === 'contributor';
+
   const [location, setLocation] = useState(initialLocationState);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -90,6 +94,11 @@ export default function EditLocation() {
   const [keywordInput, setKeywordInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+
+  // Contributors management (admin only)
+  const [allContributors, setAllContributors] = useState([]);
+  const [contributorSearch, setContributorSearch] = useState('');
+  const [contributorLoading, setContributorLoading] = useState(false);
 
   // Confirm dialog state
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null });
@@ -131,15 +140,41 @@ export default function EditLocation() {
       setLocationId(id);
       loadLocation(id);
     } else {
-      setIsLoading(false);
+      // Contributors cannot create new locations
+      if (isContributor) navigate(createPageUrl('AdminLocations'));
+      else setIsLoading(false);
     }
-  }, []);
+  }, [isContributor]);
+
+  // Load all contributors list (admin only, for assignment UI)
+  useEffect(() => {
+    if (!currentUser || isContributor) return;
+    User.listContributors().then(setAllContributors).catch(console.error);
+  }, [currentUser, isContributor]);
+
+  const handleManageContributor = async (contributorId, action) => {
+    if (!locationId) return;
+    setContributorLoading(true);
+    try {
+      await Location.manageContributor(locationId, contributorId, action);
+      const updated = await Location.get(locationId);
+      setLocation(prev => ({ ...prev, allowed_contributors: updated.allowed_contributors || [] }));
+    } catch (e) {
+      toast({ title: 'שגיאה בעדכון תורמי התוכן', description: e.message, variant: 'destructive' });
+    }
+    setContributorLoading(false);
+  };
 
   const loadLocation = async (id) => {
     try {
       const locations = await Location.list();
       const foundLocation = locations.find((l) => l.id === id);
       if (foundLocation) {
+        // Contributor access guard: redirect if not in allowed_contributors
+        if (isContributor && currentUser && !foundLocation.allowed_contributors?.includes(currentUser.id)) {
+          navigate(createPageUrl('AdminLocations'));
+          return;
+        }
         const loaded = {
           ...initialLocationState,
           ...foundLocation,
@@ -387,7 +422,18 @@ export default function EditLocation() {
     e.preventDefault();
     setIsSaving(true);
     try {
-      const payload = {
+      // Contributors may only update content fields — not meta/status/coordinates
+      const payload = isContributor ? {
+        name: location.name,
+        name_en: location.name_en,
+        main_image: location.main_image,
+        audio_file: location.audio_file,
+        full_story: location.full_story || { title: '', content: '' },
+        full_story_en: location.full_story_en || { title: '', content: '' },
+        videos: location.videos || [],
+        gallery: location.gallery || [],
+        search_keywords: location.search_keywords || [],
+      } : {
         ...location,
         full_story: location.full_story || { title: '', content: '' },
         videos: location.videos || [],
@@ -960,8 +1006,8 @@ export default function EditLocation() {
           {/* ── RIGHT COLUMN (sidebar) ── */}
           <div className="xl:col-span-1 space-y-6">
 
-            {/* Status & QR */}
-            <Card className="bg-white border-gray-200 shadow-sm">
+            {/* Status & QR — admin only */}
+            {!isContributor && <Card className="bg-white border-gray-200 shadow-sm">
               <CardHeader className="p-5 sm:p-6 border-b border-gray-100">
                 <CardTitle className="text-base sm:text-lg text-gray-900">סטטוס וזיהוי</CardTitle>
               </CardHeader>
@@ -1063,7 +1109,7 @@ export default function EditLocation() {
                   </div>
                 </div>
               </CardContent>
-            </Card>
+            </Card>}
 
             {/* Search Keywords */}
             <Card className="bg-white border-gray-200 shadow-sm">
@@ -1109,8 +1155,8 @@ export default function EditLocation() {
               </CardContent>
             </Card>
 
-            {/* Stats */}
-            {locationId && (
+            {/* Stats — admin only */}
+            {!isContributor && locationId && (
               <Card className="bg-white border-gray-200 shadow-sm">
                 <CardHeader className="p-5 sm:p-6 border-b border-gray-100">
                   <CardTitle className="text-base sm:text-lg text-gray-900">סטטיסטיקות</CardTitle>
@@ -1150,6 +1196,89 @@ export default function EditLocation() {
                       <RotateCcw className="w-3.5 h-3.5" /> איפוס הפעלות אודיו
                     </Button>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Contributors — admin only */}
+            {!isContributor && locationId && (
+              <Card className="bg-white border-gray-200 shadow-sm">
+                <CardHeader className="p-5 sm:p-6 border-b border-gray-100">
+                  <CardTitle className="text-base sm:text-lg text-gray-900">תורמי תוכן</CardTitle>
+                  <CardDescription className="text-gray-400 text-sm">
+                    משתמשים אלה יוכלו לערוך תוכן במקום זה.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-5 sm:p-6 space-y-4">
+                  {/* Current contributors */}
+                  <div className="space-y-2">
+                    {(location.allowed_contributors || []).length === 0 && (
+                      <p className="text-xs text-gray-400 text-center py-2">לא הוקצו תורמי תוכן למקום זה</p>
+                    )}
+                    {(location.allowed_contributors || []).map(uid => {
+                      const profile = allContributors.find(c => c.id === uid);
+                      return (
+                        <div key={uid} className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                          <div>
+                            <p className="text-xs font-semibold text-blue-800">{profile?.full_name || '—'}</p>
+                            <p className="text-[11px] text-blue-500">{profile?.email || uid.slice(0, 8) + '...'}</p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={contributorLoading}
+                            onClick={() => handleManageContributor(uid, 'remove')}
+                            className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Add contributor */}
+                  {allContributors.filter(c => !(location.allowed_contributors || []).includes(c.id)).length > 0 && (
+                    <div className="border-t border-gray-100 pt-3">
+                      <p className="text-xs font-medium text-gray-500 mb-2">הוסף תורם תוכן:</p>
+                      <div className="relative mb-2">
+                        <Input
+                          placeholder="חיפוש לפי שם..."
+                          value={contributorSearch}
+                          onChange={e => setContributorSearch(e.target.value)}
+                          className="bg-white border-gray-200 text-gray-900 text-xs h-8"
+                        />
+                      </div>
+                      <div className="space-y-1 max-h-40 overflow-y-auto">
+                        {allContributors
+                          .filter(c =>
+                            !(location.allowed_contributors || []).includes(c.id) &&
+                            (contributorSearch === '' ||
+                              c.full_name?.toLowerCase().includes(contributorSearch.toLowerCase()) ||
+                              c.email?.toLowerCase().includes(contributorSearch.toLowerCase()))
+                          )
+                          .map(c => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              disabled={contributorLoading}
+                              onClick={() => handleManageContributor(c.id, 'add')}
+                              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-right hover:bg-gray-50 border border-gray-100 transition-colors"
+                            >
+                              <UserPlus className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium text-gray-800 truncate">{c.full_name || '—'}</p>
+                                <p className="text-[11px] text-gray-400 truncate">{c.email}</p>
+                              </div>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                  {contributorLoading && (
+                    <div className="flex justify-center pt-1">
+                      <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

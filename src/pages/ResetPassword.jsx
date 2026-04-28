@@ -44,7 +44,13 @@ export default function ResetPassword() {
       const { error } = await supabase.auth.updateUser({ password });
       if (error) throw error;
       setSuccess(true);
-      setTimeout(() => navigate(createPageUrl('AdminDashboard')), 2500);
+      // Redirect based on role
+      const { data: { user: updatedUser } } = await supabase.auth.getUser();
+      const role = updatedUser?.app_metadata?.role;
+      const destination = role === 'contributor'
+        ? createPageUrl('AdminLocations')
+        : createPageUrl('AdminDashboard');
+      setTimeout(() => navigate(destination), 2500);
     } catch {
       setError('שגיאה באיפוס הסיסמה. נסה לבקש קישור חדש.');
     } finally {

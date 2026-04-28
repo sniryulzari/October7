@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Location } from '@/api/entities';
+import { useAuth } from '@/api/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -42,16 +43,23 @@ function IconBtn({ children, className = '', ...props }) {
 }
 
 export default function ManageLocations() {
+  const { user } = useAuth();
+  const isContributor = user?.role === 'contributor';
+
   const [locations, setLocations] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  useEffect(() => { loadLocations(); }, []);
+  useEffect(() => { loadLocations(); }, [user]);
 
   const loadLocations = async () => {
+    if (!user) return;
     setIsLoading(true);
     try {
-      setLocations(await Location.list('-created_date'));
+      const data = isContributor
+        ? await Location.getByContributor(user.id)
+        : await Location.list('-created_date');
+      setLocations(data);
     } catch (e) {
       console.error(e);
     }
@@ -77,17 +85,23 @@ export default function ManageLocations() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">ניהול מקומות</h1>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {isContributor ? 'המקומות שלי' : 'ניהול מקומות'}
+          </h1>
           <p className="text-gray-400 text-sm mt-0.5">
-            {!isLoading && `${locations.length} מקומות במערכת`}
+            {!isLoading && (isContributor
+              ? `${locations.length} מקומות מוקצים לך`
+              : `${locations.length} מקומות במערכת`)}
           </p>
         </div>
-        <Link to={createPageUrl("AdminEditLocation")}>
-          <Button className="bg-[#1e2139] hover:bg-[#2a2f4a] text-white rounded-xl gap-2 shadow-sm">
-            <PlusCircle className="h-4 w-4" />
-            הוסף מקום חדש
-          </Button>
-        </Link>
+        {!isContributor && (
+          <Link to={createPageUrl('AdminEditLocation')}>
+            <Button className="bg-[#1e2139] hover:bg-[#2a2f4a] text-white rounded-xl gap-2 shadow-sm">
+              <PlusCircle className="h-4 w-4" />
+              הוסף מקום חדש
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Search */}
@@ -182,31 +196,33 @@ export default function ManageLocations() {
                           </IconBtn>
                         </Link>
 
-                        {/* Delete */}
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <IconBtn className="hover:text-red-500 hover:bg-red-50">
-                              <Trash2 className="w-4 h-4" />
-                            </IconBtn>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent className="bg-white border-gray-200" dir="rtl">
-                            <AlertDialogHeader>
-                              <AlertDialogTitle className="text-gray-900">מחיקת "{loc.name}"</AlertDialogTitle>
-                              <AlertDialogDescription className="text-gray-500">
-                                פעולה זו תמחק את המקום לצמיתות ולא ניתן לשחזרה.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel className="rounded-xl border-gray-200 text-gray-700">ביטול</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="bg-red-500 hover:bg-red-600 text-white rounded-xl"
-                                onClick={() => handleDelete(loc.id, loc.name)}
-                              >
-                                מחק לצמיתות
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        {/* Delete — admin only */}
+                        {!isContributor && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <IconBtn className="hover:text-red-500 hover:bg-red-50">
+                                <Trash2 className="w-4 h-4" />
+                              </IconBtn>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="bg-white border-gray-200" dir="rtl">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle className="text-gray-900">מחיקת "{loc.name}"</AlertDialogTitle>
+                                <AlertDialogDescription className="text-gray-500">
+                                  פעולה זו תמחק את המקום לצמיתות ולא ניתן לשחזרה.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel className="rounded-xl border-gray-200 text-gray-700">ביטול</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="bg-red-500 hover:bg-red-600 text-white rounded-xl"
+                                  onClick={() => handleDelete(loc.id, loc.name)}
+                                >
+                                  מחק לצמיתות
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
