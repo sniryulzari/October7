@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowRight, MapPin, Headphones, Route, Users, Shield, Heart, BookOpen, Mail } from 'lucide-react';
+import { ArrowRight, MapPin, Headphones, Shield, BookOpen, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 
@@ -39,23 +39,15 @@ export default function AboutPage() {
         {/* הצגת הפרויקט */}
         <Card className="bg-white border-0 shadow-lg">
           <CardContent className="p-8 sm:p-10">
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-[#1D4E8F] rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Heart className="w-8 h-8 text-white" />
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-bold text-[#1A1A1A] mb-4">
-                זיכרון דיגיטלי לאירועי 7 באוקטובר
-              </h2>
-            </div>
-            
             <div className="prose prose-lg max-w-none text-[#555E6D] leading-relaxed space-y-4">
               <p className="text-lg sm:text-xl leading-relaxed">
-                האפליקציה נועדה לאפשר למבקרים באזור עוטף עזה להכיר ולהבין את האירועים הקשים 
-                שהתרחשו במקומות המרכזיים במהלך הטבח ב־7 באוקטובר 2023.
+                ״בשביל הזיכרון 7 באוקטובר״ הוא פרויקט שמטרתו לאפשר לכל מבקר במקומות שבהם אירע טבח 7 באוקטובר 2023, לשמוע ולהבין מה קרה שם.
               </p>
               <p className="text-lg leading-relaxed">
-                באמצעות סריקת קוד QR הממוקם באתרים, ניתן להאזין לסיפורו של כל מקום 
-                ולצפות בתמונות ובקטעי וידאו אותנטיים מהיום ההוא.
+                אנחנו חושבים שלהגיע למקום, להסתכל מסביב, ולהמשיך הלאה מבלי לדעת מה התרחש שם — זו חוויה חסרה. לכן אנחנו רוצים לאפשר לכל מי שמעוניין לשמוע את הסיפור ולהבין מה קרה בתחילת אותו בוקר וכיצד התפתחו האירועים.
+              </p>
+              <p className="text-lg leading-relaxed">
+                לשם כך מיקמנו קוד QR בכל אחד מהמקומות המרכזיים, וכל מי שמגיע למקום יכול לסרוק את הקוד עם הטלפון הנייד ולשמוע את הסיפור המלא, בליווי תמונות וקטעי וידאו. המידע מונגש לציבור בחינם ונועד לשמר את זכר האירועים של אותו יום.
               </p>
             </div>
           </CardContent>
@@ -65,7 +57,7 @@ export default function AboutPage() {
         <Card className="bg-white border-0 shadow-lg">
           <CardContent className="p-8 sm:p-10">
             <h2 className="text-2xl sm:text-3xl font-bold text-[#1A1A1A] mb-8 text-center">
-              מטרות האפליקציה
+              מטרות האתר
             </h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -74,9 +66,9 @@ export default function AboutPage() {
                   <Headphones className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold text-[#1A1A1A] mb-2">הנגשת המידע</h3>
+                  <h3 className="text-xl font-semibold text-[#1A1A1A] mb-2">הבנה במקום</h3>
                   <p className="text-[#555E6D] leading-relaxed">
-                    לאפשר לכל אדם לשמוע את הסיפור של המקום בו הוא נמצא באופן נגיש ומיידי.
+                    כל מי שמגיע למקום יכול לשמוע בדיוק מה קרה שם — מתחילת אותו בוקר ועד סופו.
                   </p>
                 </div>
               </div>
@@ -88,31 +80,31 @@ export default function AboutPage() {
                 <div>
                   <h3 className="text-xl font-semibold text-[#1A1A1A] mb-2">שימור הזיכרון</h3>
                   <p className="text-[#555E6D] leading-relaxed">
-                    שמירה על עדויות, תמונות, סרטונים ומסמכים חשובים לדורות הבאים.
+                    שמירה על תיעוד, תמונות וקטעי וידאו מאותו יום לדורות הבאים.
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-[#1D4E8F] rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Route className="w-6 h-6 text-white" />
+                  <Shield className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold text-[#1A1A1A] mb-2">הנחיית מסלול</h3>
+                  <h3 className="text-xl font-semibold text-[#1A1A1A] mb-2">נגישות לכולם</h3>
                   <p className="text-[#555E6D] leading-relaxed">
-                    הצעת מסלול מסודר ומותאם אישית למטיילים בין האתרים השונים.
+                    המידע מונגש בחינם לכל אדם עם טלפון נייד, ללא צורך בהורדת אפליקציה.
                   </p>
                 </div>
               </div>
 
               <div className="flex items-start gap-4">
                 <div className="w-12 h-12 bg-[#1D4E8F] rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Users className="w-6 h-6 text-white" />
+                  <MapPin className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold text-[#1A1A1A] mb-2">חיבור קהילתי</h3>
+                  <h3 className="text-xl font-semibold text-[#1A1A1A] mb-2">המשך הסיפור</h3>
                   <p className="text-[#555E6D] leading-relaxed">
-                    יצירת גשר בין המבקרים לבין הסיפורים האישיים של האנשים שהיו שם.
+                    מי שרוצה לשמוע עוד — יכול להמשיך למקומות נוספים ולהבין את התמונה הרחבה.
                   </p>
                 </div>
               </div>
@@ -132,29 +124,29 @@ export default function AboutPage() {
                 <div className="w-16 h-16 bg-[#1D4E8F] rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl font-bold text-white">1</span>
                 </div>
-                <h3 className="text-lg font-semibold text-[#1A1A1A] mb-2">סרוק את הברקוד</h3>
+                <h3 className="text-lg font-semibold text-[#1A1A1A] mb-2">הגע למקום</h3>
                 <p className="text-[#555E6D] text-sm leading-relaxed">
-                  מצא את קוד ה-QR במקום בו אתה נמצא וסרוק אותו עם הטלפון
+                  הגע לאחד מהמקומות בעוטף עזה — קיבוץ, מיגונית, או כל אתר אחר
                 </p>
               </div>
-              
+
               <div className="text-center">
                 <div className="w-16 h-16 bg-[#1D4E8F] rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl font-bold text-white">2</span>
                 </div>
-                <h3 className="text-lg font-semibold text-[#1A1A1A] mb-2">קבל דף ייעודי</h3>
+                <h3 className="text-lg font-semibold text-[#1A1A1A] mb-2">סרוק את קוד ה-QR</h3>
                 <p className="text-[#555E6D] text-sm leading-relaxed">
-                  תגיע לדף המקום עם נגן אודיו, תמונות וכל המידע הרלוונטי
+                  סרוק את הקוד המוצב במקום עם הטלפון הנייד
                 </p>
               </div>
-              
+
               <div className="text-center">
                 <div className="w-16 h-16 bg-[#1D4E8F] rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl font-bold text-white">3</span>
                 </div>
-                <h3 className="text-lg font-semibold text-[#1A1A1A] mb-2">האזן וגלה</h3>
+                <h3 className="text-lg font-semibold text-[#1A1A1A] mb-2">שמע את הסיפור</h3>
                 <p className="text-[#555E6D] text-sm leading-relaxed">
-                  האזן לסיפור המקום וצפה בתמונות ובסרטונים מהיום ההוא
+                  תשמע מה קרה שם ב-7 באוקטובר — בליווי תמונות וקטעי וידאו מאותו יום
                 </p>
               </div>
             </div>
@@ -170,16 +162,13 @@ export default function AboutPage() {
             
             <div className="prose prose-lg max-w-none text-[#555E6D] leading-relaxed space-y-4">
               <p className="text-lg leading-relaxed">
-                פרויקט "זיכרון 7.10" הוא יוזמה עצמאית שנוצרה מתוך הרצון לשמר ולהנציח את זכר 
-                הקורבנות ולספר את סיפורם של המקומות שנפגעו באותו יום נורא.
+                ״בשביל הזיכרון 7 באוקטובר״ הוא יוזמה עצמאית שנוצרה מתוך הרצון לשמר ולהנציח את זכר הנרצחים והחטופים, ולספר את סיפורם של המקומות שנפגעו באותו יום.
               </p>
               <p className="leading-relaxed">
-                הפרויקט פותח בשיתוף עם גורמים מקומיים, עדים לאירועים ובני משפחות של נספים, 
-                במטרה ליצור חוויה משמעותית ומכבדת לכל מי שבוחר לבקר באתרים.
+                הפרויקט פותח במטרה ליצור חוויה משמעותית ומכבדת לכל מי שבוחר לבקר במקומות — ולאפשר לו לצאת משם עם הבנה אמיתית של מה שהתרחש שם.
               </p>
               <p className="leading-relaxed">
-                אנו מאמינים בכוחה של הטכנולוgia לשרת מטרות חברתיות חשובות ולהפוך מידע חיוני 
-                לנגיש עבור כל אדם, בכל מקום ובכל זמן.
+                אנו מאמינים בכוחה של הטכנולוגיה לשרת מטרות חברתיות חשובות ולהפוך מידע חיוני לנגיש עבור כל אדם, בכל מקום ובכל זמן.
               </p>
             </div>
             
@@ -189,8 +178,7 @@ export default function AboutPage() {
                 <h3 className="text-lg font-semibold text-[#1A1A1A]">התחייבותנו</h3>
               </div>
               <p className="text-[#555E6D] leading-relaxed">
-                אנו מתחייבים לשמור על דיוק המידע, לכבד את זכר הנפגעים ולהציג את התכנים 
-                בצורה רגישה ומכבדת. כל התכנים נבדקים ומאושרים על ידי גורמים מוסמכים.
+                אנו מתחייבים לדיוק — כל הסיפורים מבוססים על מקורות מתועדים. המידע מוצג בצורה רגישה ומכבדת, מתוך כבוד לנרצחים, לחטופים ולמשפחותיהם.
               </p>
             </div>
           </CardContent>
@@ -235,7 +223,7 @@ export default function AboutPage() {
               <Link to={createPageUrl("Home")}>
                 <Button className="bg-[#1D4E8F] hover:bg-[#2560B0] text-white px-8 py-3">
                   <MapPin className="w-5 h-5 mr-2" />
-                  התחל לחקור את המקומות
+                  לכל המקומות
                 </Button>
               </Link>
             </div>

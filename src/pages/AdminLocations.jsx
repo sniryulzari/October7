@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Location } from '@/api/entities';
 import { useAuth } from '@/api/AuthContext';
+import { sanitizeError } from '@/utils/sanitizeError';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -72,7 +73,7 @@ export default function ManageLocations() {
       setLocations(prev => prev.filter(l => l.id !== id));
       toast({ title: `"${name}" נמחק בהצלחה` });
     } catch (e) {
-      toast({ title: 'שגיאה במחיקה', description: e.message, variant: 'destructive' });
+      toast({ title: 'שגיאה במחיקה', description: sanitizeError(e), variant: 'destructive' });
     }
   };
 
@@ -174,7 +175,7 @@ export default function ManageLocations() {
                             </AlertDialogHeader>
                             <div className="flex flex-col items-center gap-4 py-4">
                               {loc.qr_code_image_url
-                                ? <img src={loc.qr_code_image_url} alt={`QR for ${loc.name}`} className="w-48 h-48 bg-white p-2 rounded-xl border border-gray-200" />
+                                ? <img src={loc.qr_code_image_url} alt={`QR for ${loc.name}`} className="w-48 h-48 bg-white p-2 rounded-xl border border-gray-200" loading="lazy" />
                                 : <p className="text-amber-600 text-sm">יש ליצור תמונת QR בדף העריכה.</p>
                               }
                               <Input

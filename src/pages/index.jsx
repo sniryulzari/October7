@@ -36,10 +36,26 @@ import AccessibilityStatement from "./AccessibilityStatement";
 
 import Terms from "./Terms";
 
-import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
 import { LanguageProvider } from '../utils/language';
-import { AuthProvider } from '../api/AuthContext';
+import { AuthProvider, useAuth } from '../api/AuthContext';
 import { createPageUrl } from '../utils';
+
+const ADMIN_PAGES = new Set([
+  'AdminDashboard',
+  'AdminLocations',
+  'AdminEditLocation',
+  'AdminUsers',
+  'AdminStats',
+]);
+
+function ProtectedRoute({ component: Component }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return null;
+  if (!user) return <Navigate to={createPageUrl('Login')} replace />;
+  if (!['admin', 'contributor'].includes(user.role)) return <Navigate to={createPageUrl('AccessDenied')} replace />;
+  return <Component />;
+}
 
 const PAGES = {
     
@@ -103,7 +119,15 @@ function PagesContent() {
             <Routes>
                 <Route path="/" element={<Home />} />
                 {Object.entries(PAGES).map(([name, Component]) => (
-                    <Route key={name} path={createPageUrl(name)} element={<Component />} />
+                    <Route
+                        key={name}
+                        path={createPageUrl(name)}
+                        element={
+                            ADMIN_PAGES.has(name)
+                                ? <ProtectedRoute component={Component} />
+                                : <Component />
+                        }
+                    />
                 ))}
             </Routes>
         </Layout>

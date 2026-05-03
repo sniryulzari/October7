@@ -65,8 +65,8 @@ ${formData.message}
       <div className="min-h-screen bg-[#F2F2F2] flex items-center justify-center">
         <div className="max-w-md mx-auto text-center">
           <CheckCircle className="w-16 h-16 text-[#1D4E8F] mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-[#1A1A1A] mb-2">ההודעה נשלחה בהצלחה</h1>
-          <p className="text-[#555E6D] mb-6">תודה על פנייתכם. נחזור אליכם בהקדם האפשרי.</p>
+          <h1 className="text-2xl font-bold text-[#1A1A1A] mb-2">ההודעה התקבלה</h1>
+          <p className="text-[#555E6D] mb-6">תודה. נחזור אליך בהקדם.</p>
           <Button onClick={() => setIsSubmitted(false)} className="bg-[#1D4E8F] hover:bg-[#2560B0]">שלח הודעה נוספת</Button>
         </div>
       </div>
@@ -83,7 +83,7 @@ ${formData.message}
             </div>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-[#1A1A1A] mb-4">צור קשר</h1>
-          <p className="text-lg text-[#555E6D]">נשמח לעזור ולענות על שאלותיכם</p>
+          <p className="text-lg text-[#555E6D]">שאלות על הפרויקט, תיקון מידע, או רצון לתרום תוכן — נשמח לשמוע</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

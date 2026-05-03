@@ -59,9 +59,11 @@ export default function Home() {
       <section className="bg-[#0C1C2E] text-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-28 lg:py-44">
           <div className="text-center space-y-8">
-            <p className="text-xs font-semibold tracking-[0.35em] text-white/60 uppercase">
-              7.10.2023
-            </p>
+            <div className="flex justify-center">
+              <div className="w-28 h-28 lg:w-36 lg:h-36 rounded-full overflow-hidden shadow-2xl ring-2 ring-white/20">
+                <img src="/logo.png" alt="לוגו זיכרון 7.10" className="w-full h-full object-cover object-center" />
+              </div>
+            </div>
 
             <h1 className="text-4xl lg:text-6xl font-bold text-white leading-tight">
               {t('home.title')}
@@ -186,6 +188,7 @@ export default function Home() {
                       src={location.main_image}
                       alt={location.name}
                       className="w-full h-full object-cover"
+                      loading="lazy"
                     />
                   ) : (
                     <div className="w-full h-full bg-[#F2F2F2] flex items-center justify-center">

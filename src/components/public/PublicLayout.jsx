@@ -28,8 +28,8 @@ export default function PublicLayout({ children }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link to={createPageUrl("Home")} className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
-                <Route className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                <img src="/logo.png" alt={t('app.name')} className="w-full h-full object-cover object-center" />
               </div>
               <span className="text-xl font-bold text-white hidden sm:block">{t('app.name')}</span>
             </Link>
@@ -172,8 +172,8 @@ export default function PublicLayout({ children }) {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                  <Route className="w-5 h-5 text-white" />
+                <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                  <img src="/logo.png" alt={t('app.name')} className="w-full h-full object-cover object-center" />
                 </div>
                 <h3 className="text-lg font-semibold">{t('app.name')}</h3>
               </div>
@@ -215,7 +215,7 @@ export default function PublicLayout({ children }) {
                 </Link>
                 <Link to={createPageUrl("AccessibilityStatement")} className="flex items-center gap-2 text-white/80 hover:text-white text-sm transition-colors">
                   <Accessibility className="w-4 h-4 shrink-0" aria-hidden="true" />
-                  {t('footer.accessibility') || 'הצהרת נגישות'}
+                  {t('footer.accessibility')}
                 </Link>
               </div>
             </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User } from '@/api/entities';
 import { supabase } from '@/api/supabaseClient';
@@ -9,6 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShieldX, Loader2, Eye, EyeOff, ArrowRight, CheckCircle } from 'lucide-react';
 
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_SECONDS = 60;
+const RESET_COOLDOWN_SECONDS = 30;
+
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -17,10 +21,34 @@ export default function Login() {
   const [error, setError] = useState('');
   const [mode, setMode] = useState('login'); // 'login' | 'forgot'
   const [resetSent, setResetSent] = useState(false);
+
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState(null);
+  const [lockCountdown, setLockCountdown] = useState(0);
+
+  const [resetCooldownUntil, setResetCooldownUntil] = useState(null);
+  const [resetCountdown, setResetCountdown] = useState(0);
+
   const navigate = useNavigate();
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    if (!lockedUntil && !resetCooldownUntil) return;
+    timerRef.current = setInterval(() => {
+      const now = Date.now();
+      if (lockedUntil) setLockCountdown(Math.max(0, Math.ceil((lockedUntil - now) / 1000)));
+      if (resetCooldownUntil) setResetCountdown(Math.max(0, Math.ceil((resetCooldownUntil - now) / 1000)));
+      if ((!lockedUntil || now >= lockedUntil) && (!resetCooldownUntil || now >= resetCooldownUntil)) {
+        clearInterval(timerRef.current);
+      }
+    }, 1000);
+    return () => clearInterval(timerRef.current);
+  }, [lockedUntil, resetCooldownUntil]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (lockedUntil && Date.now() < lockedUntil) return;
+
     setError('');
     setIsLoading(true);
     try {
@@ -34,8 +62,23 @@ export default function Login() {
         setError('אין לך הרשאות גישה למערכת');
         await User.logout();
       }
-    } catch {
-      setError('אימייל או סיסמה שגויים');
+      setLoginAttempts(0);
+    } catch (err) {
+      if (err?.status === 429) {
+        const until = Date.now() + LOCKOUT_SECONDS * 1000;
+        setLockedUntil(until);
+        setError(`יותר מדי ניסיונות — נסה שוב בעוד ${LOCKOUT_SECONDS} שניות`);
+      } else {
+        const next = loginAttempts + 1;
+        setLoginAttempts(next);
+        if (next >= MAX_LOGIN_ATTEMPTS) {
+          const until = Date.now() + LOCKOUT_SECONDS * 1000;
+          setLockedUntil(until);
+          setError(`יותר מדי ניסיונות — נסה שוב בעוד ${LOCKOUT_SECONDS} שניות`);
+        } else {
+          setError('אימייל או סיסמה שגויים');
+        }
+      }
     } finally {
       setIsLoading(false);
     }
@@ -43,6 +86,8 @@ export default function Login() {
 
   const handleForgotPassword = async (e) => {
     e.preventDefault();
+    if (resetCooldownUntil && Date.now() < resetCooldownUntil) return;
+
     setError('');
     setIsLoading(true);
     try {
@@ -50,8 +95,9 @@ export default function Login() {
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
       if (error) throw error;
       setResetSent(true);
+      setResetCooldownUntil(Date.now() + RESET_COOLDOWN_SECONDS * 1000);
     } catch {
-      setError('שגיאה בשליחת המייל. בדוק שהכתובת נכונה.');
+      setError('אם הכתובת קיימת במערכת, נשלח אליה קישור לאיפוס הסיסמה.');
     } finally {
       setIsLoading(false);
     }
@@ -118,10 +164,14 @@ export default function Login() {
 
               <Button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || (lockedUntil && Date.now() < lockedUntil)}
                 className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white font-semibold py-3"
               >
-                {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> מתחבר...</> : 'כניסה'}
+                {isLoading
+                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> מתחבר...</>
+                  : lockCountdown > 0
+                    ? `נסה שוב בעוד ${lockCountdown}ש'`
+                    : 'כניסה'}
               </Button>
 
               <button
@@ -161,10 +211,14 @@ export default function Login() {
 
               <Button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || (resetCooldownUntil && Date.now() < resetCooldownUntil)}
                 className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white font-semibold py-3"
               >
-                {isLoading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> שולח...</> : 'שלח קישור לאיפוס'}
+                {isLoading
+                  ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> שולח...</>
+                  : resetCountdown > 0
+                    ? `ניתן לשלוח שוב בעוד ${resetCountdown}ש'`
+                    : 'שלח קישור לאיפוס'}
               </Button>
 
               <button

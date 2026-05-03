@@ -43,20 +43,36 @@ function markerSvg(color) {
   </svg>`;
 }
 
+function safeText(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+function safeImageUrl(url) {
+  try {
+    const u = new URL(url);
+    return ['http:', 'https:'].includes(u.protocol) ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 function makeInfoContent(location, color, category, dist) {
   const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${location.coordinates.lat},${location.coordinates.lng}`;
   const detailUrl = createPageUrl(`Location?id=${location.id}`);
+  const imgUrl = safeImageUrl(location.main_image);
   return `
     <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 280px; min-width: 220px;">
-      ${location.main_image ? `
+      ${imgUrl ? `
         <div style="margin: -8px -8px 10px; overflow: hidden; height: 130px; border-radius: 8px 8px 0 0;">
-          <img src="${location.main_image}" alt="${location.name}" style="width:100%;height:130px;object-fit:cover;" />
+          <img src="${imgUrl}" alt="" style="width:100%;height:130px;object-fit:cover;" loading="lazy" />
         </div>` : ''}
-      <h3 style="margin:0 0 6px;font-size:17px;font-weight:700;color:#1A1A1A;">${location.name}</h3>
-      <span style="background:${color};color:white;padding:2px 10px;border-radius:10px;font-size:12px;">${category}</span>
-      ${dist ? `<p style="margin:8px 0 2px;font-size:12px;color:#888;">📍 ${dist} ממיקומך</p>` : ''}
+      <h3 style="margin:0 0 6px;font-size:17px;font-weight:700;color:#1A1A1A;">${safeText(location.name)}</h3>
+      <span style="background:${color};color:white;padding:2px 10px;border-radius:10px;font-size:12px;">${safeText(category)}</span>
+      ${dist ? `<p style="margin:8px 0 2px;font-size:12px;color:#888;">📍 ${safeText(dist)} ממיקומך</p>` : ''}
       <p style="margin:10px 0;font-size:13px;color:#5C5750;line-height:1.5;">
-        ${location.full_story?.title || 'מקום זיכרון מאירועי 7 באוקטובר 2023'}
+        ${safeText(location.full_story?.title || 'מקום זיכרון מאירועי 7 באוקטובר 2023')}
       </p>
       <div style="display:flex;gap:8px;margin-top:12px;">
         <a href="${detailUrl}"
@@ -214,7 +230,11 @@ export default function Map() {
 
       const el = document.createElement('div');
       el.style.cssText = 'display:flex;flex-direction:column;align-items:center;cursor:pointer;';
-      el.innerHTML = markerSvg(color) + `<div style="background:${color};color:white;font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap;margin-top:-2px;box-shadow:0 1px 4px rgba(0,0,0,0.4);font-family:Arial,sans-serif;max-width:120px;overflow:hidden;text-overflow:ellipsis;direction:rtl;">${location.name}</div>`;
+      const labelDiv = document.createElement('div');
+      labelDiv.style.cssText = `background:${color};color:white;font-size:11px;font-weight:700;padding:2px 7px;border-radius:4px;white-space:nowrap;margin-top:-2px;box-shadow:0 1px 4px rgba(0,0,0,0.4);font-family:Arial,sans-serif;max-width:120px;overflow:hidden;text-overflow:ellipsis;direction:rtl;`;
+      labelDiv.textContent = location.name;
+      el.innerHTML = markerSvg(color);
+      el.appendChild(labelDiv);
 
       el.addEventListener('click', () => {
         setSelectedIdRef.current?.(location.id);
@@ -327,7 +347,7 @@ export default function Map() {
             </div>
             <h1 className="text-3xl md:text-4xl font-bold text-[#1A1A1A]">מפת המקומות</h1>
           </div>
-          <p className="text-base text-[#5C5750]">גלו את המקומות שנפגעו באירועי 7 באוקטובר 2023</p>
+          <p className="text-base text-[#5C5750]">בחר מקום במפה כדי לשמוע מה קרה שם ב-7 באוקטובר 2023</p>
         </div>
 
         {/* Error */}
@@ -490,7 +510,7 @@ export default function Map() {
                             <div className="flex gap-3">
                               <div className="w-14 h-16 rounded-lg overflow-hidden shrink-0 bg-[#EDE9E3]">
                                 {location.main_image ? (
-                                  <img src={location.main_image} alt={location.name} className="w-full h-full object-cover" />
+                                  <img src={location.main_image} alt={location.name} className="w-full h-full object-cover" loading="lazy" />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center">
                                     <MapPin className="w-5 h-5 text-[#5C5750]" />

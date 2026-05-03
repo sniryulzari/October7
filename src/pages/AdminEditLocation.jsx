@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Location, User } from '@/api/entities';
 import { useAuth } from '@/api/AuthContext';
+import { sanitizeError } from '@/utils/sanitizeError';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -104,7 +105,7 @@ export default function EditLocation() {
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', description: '', onConfirm: null });
 
   // ElevenLabs TTS state
-  const [elevenLabsKey, setElevenLabsKey] = useState(() => localStorage.getItem('elevenlabs_key') || '');
+  const [elevenLabsKey, setElevenLabsKey] = useState('');
   const [ttsVoice, setTtsVoice] = useState('pNInz6obpgDQGcFmaJgB');
   const [customVoiceId, setCustomVoiceId] = useState('');
   const [ttsLang, setTtsLang] = useState('he');
@@ -200,7 +201,7 @@ export default function EditLocation() {
         setLocation(loaded);
       }
     } catch (error) {
-      toast({ title: 'שגיאה בטעינת המקום', description: error.message, variant: 'destructive' });
+      toast({ title: 'שגיאה בטעינת המקום', description: sanitizeError(error), variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
@@ -253,7 +254,7 @@ export default function EditLocation() {
       updateLocation((prev) => ({ ...prev, [field]: file_url }));
       toast({ title: 'הקובץ הועלה בהצלחה' });
     } catch (error) {
-      toast({ title: 'שגיאה בהעלאת הקובץ', description: error.message, variant: 'destructive' });
+      toast({ title: 'שגיאה בהעלאת הקובץ', description: sanitizeError(error), variant: 'destructive' });
     } finally {
       setIsUploading(false);
     }
@@ -270,7 +271,7 @@ export default function EditLocation() {
       updateLocation((prev) => ({ ...prev, gallery: newGallery }));
       toast({ title: 'התמונה הועלתה בהצלחה' });
     } catch (error) {
-      toast({ title: 'שגיאה בהעלאת התמונה', description: error.message, variant: 'destructive' });
+      toast({ title: 'שגיאה בהעלאת התמונה', description: sanitizeError(error), variant: 'destructive' });
     } finally {
       setIsUploading(false);
     }
@@ -287,7 +288,7 @@ export default function EditLocation() {
       updateLocation((prev) => ({ ...prev, videos: newVideos }));
       toast({ title: 'הקובץ הועלה בהצלחה' });
     } catch (error) {
-      toast({ title: 'שגיאה בהעלאת הקובץ', description: error.message, variant: 'destructive' });
+      toast({ title: 'שגיאה בהעלאת הקובץ', description: sanitizeError(error), variant: 'destructive' });
     } finally {
       setIsUploading(false);
     }
@@ -308,9 +309,8 @@ export default function EditLocation() {
   };
 
   const stripHtml = (html) => {
-    const div = document.createElement('div');
-    div.innerHTML = html || '';
-    return (div.textContent || div.innerText || '').trim();
+    if (!html) return '';
+    return (new DOMParser().parseFromString(html, 'text/html').body.textContent || '').trim();
   };
 
   const generateTTS = async () => {
@@ -375,7 +375,7 @@ export default function EditLocation() {
       setTtsBlobRef(null);
       toast({ title: 'הקריינות הוחלה בהצלחה' });
     } catch (err) {
-      toast({ title: 'שגיאה בהעלאת הקובץ', description: err.message, variant: 'destructive' });
+      toast({ title: 'שגיאה בהעלאת הקובץ', description: sanitizeError(err), variant: 'destructive' });
     } finally {
       setIsUploading(false);
     }
@@ -395,7 +395,7 @@ export default function EditLocation() {
           setLocation(prev => ({ ...prev, view_count: 0 }));
           toast({ title: 'סטטיסטיקות הצפיות אופסו' });
         } catch (error) {
-          toast({ title: 'שגיאה באיפוס', description: error.message, variant: 'destructive' });
+          toast({ title: 'שגיאה באיפוס', description: sanitizeError(error), variant: 'destructive' });
         }
       }
     );
@@ -412,7 +412,7 @@ export default function EditLocation() {
           setLocation(prev => ({ ...prev, ...updatedStats }));
           toast({ title: 'סטטיסטיקות האודיו אופסו' });
         } catch (error) {
-          toast({ title: 'שגיאה באיפוס', description: error.message, variant: 'destructive' });
+          toast({ title: 'שגיאה באיפוס', description: sanitizeError(error), variant: 'destructive' });
         }
       }
     );
@@ -451,7 +451,7 @@ export default function EditLocation() {
       navigate(createPageUrl("AdminLocations"));
       window.scrollTo(0, 0);
     } catch (error) {
-      toast({ title: 'שגיאה בשמירת המקום', description: error.message, variant: 'destructive' });
+      toast({ title: 'שגיאה בשמירת המקום', description: sanitizeError(error), variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
@@ -817,7 +817,7 @@ export default function EditLocation() {
                       />
                     </div>
                     {item.image_url && (
-                      <img src={item.image_url} className="w-full h-32 object-cover rounded-lg border border-gray-200" alt="תצוגה מקדימה" />
+                      <img src={item.image_url} className="w-full h-32 object-cover rounded-lg border border-gray-200" alt="תצוגה מקדימה" loading="lazy" />
                     )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>

@@ -157,21 +157,37 @@ function getRecommendedTime(location) {
   return Math.max(20, Math.min(base, 120));
 }
 
+function safeText(str) {
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+function safeImageUrl(url) {
+  try {
+    const u = new URL(url);
+    return ['http:', 'https:'].includes(u.protocol) ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 function makePopupHTML(location, index, recommendedTime) {
   const navUrl    = `https://www.google.com/maps/dir/?api=1&destination=${location.coordinates.lat},${location.coordinates.lng}&travelmode=driving`;
   const detailUrl = createPageUrl(`Location?id=${location.id}`);
+  const imgUrl = safeImageUrl(location.main_image);
   return `
     <div dir="rtl" style="font-family:Arial,sans-serif;max-width:280px;min-width:220px;">
-      ${location.main_image ? `
+      ${imgUrl ? `
         <div style="margin:-8px -8px 10px;overflow:hidden;height:130px;border-radius:8px 8px 0 0;">
-          <img src="${location.main_image}" style="width:100%;height:130px;object-fit:cover;" />
+          <img src="${imgUrl}" style="width:100%;height:130px;object-fit:cover;" loading="lazy" />
         </div>` : ''}
       <div style="font-size:12px;color:#888;margin-bottom:4px;">תחנה ${index + 1}</div>
-      <h3 style="margin:0 0 6px;font-size:16px;font-weight:700;color:#1A1A1A;">${location.name}</h3>
+      <h3 style="margin:0 0 6px;font-size:16px;font-weight:700;color:#1A1A1A;">${safeText(location.name)}</h3>
       <p style="margin:0 0 8px;font-size:13px;color:#5C5750;line-height:1.4;">
-        ${location.full_story?.title || 'מקום זיכרון מאירועי 7 באוקטובר 2023'}
+        ${safeText(location.full_story?.title || 'מקום זיכרון מאירועי 7 באוקטובר 2023')}
       </p>
-      <div style="font-size:12px;color:#1D4E8F;margin-bottom:10px;">⏱ זמן מומלץ: ${recommendedTime} דקות</div>
+      <div style="font-size:12px;color:#1D4E8F;margin-bottom:10px;">⏱ זמן מומלץ: ${safeText(String(recommendedTime))} דקות</div>
       <div style="display:flex;gap:8px;">
         <a href="${detailUrl}"
            style="flex:1;background:#1D4E8F;color:white;padding:8px;text-decoration:none;border-radius:6px;font-size:13px;text-align:center;display:block;">
@@ -437,7 +453,14 @@ export default function RoutePage() {
       const textDir = isRTL ? 'rtl' : 'ltr';
       const el = document.createElement('div');
       el.style.cssText = 'cursor:pointer;position:relative;width:32px;height:32px;';
-      el.innerHTML = `<div style="background:${color};color:white;width:32px;height:32px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;font-family:Arial,sans-serif;">${index + 1}</div><div style="position:absolute;top:36px;left:50%;transform:translateX(-50%);background:${color};color:white;font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.4);font-family:Arial,sans-serif;max-width:110px;overflow:hidden;text-overflow:ellipsis;direction:${textDir};">${name}</div>`;
+      const numDiv = document.createElement('div');
+      numDiv.style.cssText = `background:${color};color:white;width:32px;height:32px;border-radius:50%;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;font-family:Arial,sans-serif;`;
+      numDiv.textContent = String(index + 1);
+      const nameLabel = document.createElement('div');
+      nameLabel.style.cssText = `position:absolute;top:36px;left:50%;transform:translateX(-50%);background:${color};color:white;font-size:11px;font-weight:600;padding:2px 6px;border-radius:4px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.4);font-family:Arial,sans-serif;max-width:110px;overflow:hidden;text-overflow:ellipsis;direction:${textDir};`;
+      nameLabel.textContent = name;
+      el.appendChild(numDiv);
+      el.appendChild(nameLabel);
       el.addEventListener('click', () => {
         popupRef.current
           .setLngLat([location.coordinates.lng, location.coordinates.lat])
@@ -722,7 +745,7 @@ export default function RoutePage() {
                         <div className="hidden sm:block w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-[#F2F2F2]">
                           {location.main_image
                             ? <Link to={createPageUrl(`Location?id=${location.id}`)} onClick={() => incrementViewCount(location.id)}>
-                                <img src={location.main_image} alt={location.name} className="w-full h-full object-cover hover:opacity-80 transition-opacity" />
+                                <img src={location.main_image} alt={location.name} className="w-full h-full object-cover hover:opacity-80 transition-opacity" loading="lazy" />
                               </Link>
                             : <div className="w-full h-full flex items-center justify-center"><MapPin className="w-6 h-6 text-[#555E6D]" /></div>
                           }
@@ -757,7 +780,7 @@ export default function RoutePage() {
                           <div className="flex items-center gap-3">
                             <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-[#F2F2F2]">
                               {location.main_image
-                                ? <img src={location.main_image} alt={location.name} className="w-full h-full object-cover" />
+                                ? <img src={location.main_image} alt={location.name} className="w-full h-full object-cover" loading="lazy" />
                                 : <div className="w-full h-full flex items-center justify-center"><MapPin className="w-4 h-4 text-[#555E6D]" /></div>
                               }
                             </div>

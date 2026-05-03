@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import DOMPurify from "dompurify";
 import { Location } from "@/api/entities";
 import { useLanguage } from "@/utils/language";
 import { Button } from "@/components/ui/button";
@@ -30,9 +31,7 @@ import { createPageUrl } from "@/utils";
 
 const getTextContent = (html) => {
   if (!html) return "";
-  const div = document.createElement("div");
-  div.innerHTML = html;
-  return div.textContent || "";
+  return new DOMParser().parseFromString(html, "text/html").body.textContent || "";
 };
 
 export default function LocationPage() {
@@ -118,7 +117,7 @@ export default function LocationPage() {
           return;
         }
       } else {
-        setError("שגיאה בטעינת המידע: " + err.message);
+        setError("שגיאה בטעינת המידע. נסה לרענן את הדף.");
       }
     }
     setIsLoading(false);
@@ -594,7 +593,7 @@ export default function LocationPage() {
                 <div className="prose prose-lg max-w-none text-[#1A1A1A] leading-relaxed">
                   <div
                     className={!isStoryExpanded ? "line-clamp-6 overflow-hidden" : ""}
-                    dangerouslySetInnerHTML={{ __html: locStoryContent(location) }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(locStoryContent(location)) }}
                   />
                   {shouldShowReadMore(locStoryContent(location)) && (
                     <Button
@@ -873,7 +872,7 @@ export default function LocationPage() {
               <X className="w-6 h-6" aria-hidden="true" />
             </Button>
             <img src={selectedImage.image_url} alt={selectedImage.caption || "תמונה מהגלריה"}
-              className="max-w-full max-h-[80vh] object-contain rounded-lg" />
+              className="max-w-full max-h-[80vh] object-contain rounded-lg" loading="lazy" />
             {selectedImage.caption && (
               <p className="text-white text-center mt-4 px-4">{selectedImage.caption}</p>
             )}
