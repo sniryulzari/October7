@@ -37,7 +37,7 @@ async function backup() {
   const { data: locations, error: locationsError } = await supabase
     .from('locations')
     .select('*')
-    .order('created_at');
+    ;
 
   if (locationsError) throw new Error(`locations fetch failed: ${locationsError.message}`);
 
