@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Location } from "@/api/entities";
 import { useLanguage } from "@/utils/language";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ let cacheTimestamp = null;
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export default function SearchPage() {
-  const { t, lang, locName, locStoryTitle, locStoryContent } = useLanguage();
+  const { t, locName, locStoryTitle, locStoryContent } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [locations, setLocations] = useState([]);
@@ -167,9 +167,7 @@ export default function SearchPage() {
           )
         );
       }
-    } catch (err) {
-      console.log("Could not update view count:", err);
-    } finally {
+    } catch { /* best-effort */ } finally {
       viewCountUpdateQueue.current.delete(locationId);
     }
   };

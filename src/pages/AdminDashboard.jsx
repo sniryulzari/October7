@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Location, User } from '@/api/entities';
 import { MapPin, Eye, TrendingUp, AlertCircle, PlusCircle, BarChart2, ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 
 const STAT_CARDS = [
   { key: 'total',      label: 'סה"כ מקומות',   icon: MapPin,      bg: 'bg-blue-50',   icon_color: 'text-blue-500',   value_color: 'text-blue-600'   },

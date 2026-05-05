@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Location } from "@/api/entities";
@@ -44,14 +44,14 @@ export default function Home() {
     }
   };
 
-  const getSortedLocations = () => {
+  const sortedLocations = useMemo(() => {
     if (!userLocation) return nearbyLocations;
     return [...nearbyLocations].sort((a, b) => {
       const dA = calculateDistance(userLocation.lat, userLocation.lng, a.coordinates.lat, a.coordinates.lng);
       const dB = calculateDistance(userLocation.lat, userLocation.lng, b.coordinates.lat, b.coordinates.lng);
       return dA - dB;
     });
-  };
+  }, [nearbyLocations, userLocation]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -61,7 +61,7 @@ export default function Home() {
           <div className="text-center space-y-8">
             <div className="flex justify-center">
               <div className="w-28 h-28 lg:w-36 lg:h-36 rounded-full overflow-hidden shadow-2xl ring-2 ring-white/20">
-                <img src="/logo.png" alt="לוגו זיכרון 7.10" className="w-full h-full object-cover object-center" />
+                <img src="/logo.png" alt="לוגו זיכרון 7.10" className="w-full h-full object-cover object-center" fetchpriority="high" />
               </div>
             </div>
 
@@ -71,7 +71,7 @@ export default function Home() {
 
             <div className="w-10 h-px bg-white/25 mx-auto" />
 
-            <p className="text-lg lg:text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-lg lg:text-xl text-white/80 max-w-2xl mx-auto leading-relaxed">
               {t('home.subtitle')}
             </p>
 
@@ -98,20 +98,20 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-8">
             <div>
-              <p className="text-xs font-bold tracking-[0.3em] text-[#1D4E8F]/40 mb-4">01</p>
-              <h3 className="text-xl font-bold text-[#1A1A1A] mb-2">{t('home.step1Title')}</h3>
+              <p className="text-xs font-bold tracking-[0.3em] text-[#1D4E8F]/60 mb-4">01</p>
+              <h2 className="text-xl font-bold text-[#1A1A1A] mb-2">{t('home.step1Title')}</h2>
               <p className="text-[#555E6D] leading-relaxed">{t('home.step1Desc')}</p>
             </div>
 
             <div>
-              <p className="text-xs font-bold tracking-[0.3em] text-[#1D4E8F]/40 mb-4">02</p>
-              <h3 className="text-xl font-bold text-[#1A1A1A] mb-2">{t('home.step2Title')}</h3>
+              <p className="text-xs font-bold tracking-[0.3em] text-[#1D4E8F]/60 mb-4">02</p>
+              <h2 className="text-xl font-bold text-[#1A1A1A] mb-2">{t('home.step2Title')}</h2>
               <p className="text-[#555E6D] leading-relaxed">{t('home.step2Desc')}</p>
             </div>
 
             <div>
-              <p className="text-xs font-bold tracking-[0.3em] text-[#1D4E8F]/40 mb-4">03</p>
-              <h3 className="text-xl font-bold text-[#1A1A1A] mb-2">{t('home.step3Title')}</h3>
+              <p className="text-xs font-bold tracking-[0.3em] text-[#1D4E8F]/60 mb-4">03</p>
+              <h2 className="text-xl font-bold text-[#1A1A1A] mb-2">{t('home.step3Title')}</h2>
               <p className="text-[#555E6D] leading-relaxed">{t('home.step3Desc')}</p>
             </div>
           </div>
@@ -176,7 +176,7 @@ export default function Home() {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {getSortedLocations().map((location) => {
+            {sortedLocations.map((location) => {
               const distanceKm = userLocation
                 ? Math.round(calculateDistance(userLocation.lat, userLocation.lng, location.coordinates.lat, location.coordinates.lng))
                 : null;

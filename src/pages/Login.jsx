@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User } from '@/api/entities';
 import { supabase } from '@/api/supabaseClient';
@@ -6,7 +6,7 @@ import { createPageUrl } from '@/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { ShieldX, Loader2, Eye, EyeOff, ArrowRight, CheckCircle } from 'lucide-react';
 
 const MAX_LOGIN_ATTEMPTS = 5;
@@ -110,9 +110,9 @@ export default function Login() {
           <div className="w-16 h-16 bg-gradient-to-br from-orange-600 to-red-700 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg">
             <ShieldX className="w-8 h-8 text-white" />
           </div>
-          <CardTitle className="text-2xl font-bold text-white">
+          <h1 className="text-2xl font-bold text-white">
             {mode === 'login' ? 'כניסה לממשק ניהול' : 'איפוס סיסמה'}
-          </CardTitle>
+          </h1>
           <p className="text-slate-400 text-sm mt-1">זיכרון 7.10</p>
         </CardHeader>
 
@@ -129,6 +129,8 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin@example.com"
                   required
+                  aria-invalid={!!error}
+                  aria-describedby={error ? "login-error" : undefined}
                   className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-orange-500"
                 />
               </div>
@@ -143,6 +145,8 @@ export default function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     required
+                    aria-invalid={!!error}
+                    aria-describedby={error ? "login-error" : undefined}
                     className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-orange-500 pl-10"
                   />
                   <button
@@ -157,7 +161,7 @@ export default function Login() {
               </div>
 
               {error && (
-                <p className="text-red-400 text-sm text-center bg-red-900/30 py-2 px-3 rounded-lg">
+                <p id="login-error" role="alert" className="text-red-400 text-sm text-center bg-red-900/30 py-2 px-3 rounded-lg">
                   {error}
                 </p>
               )}
@@ -199,12 +203,14 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin@example.com"
                   required
+                  aria-invalid={!!error}
+                  aria-describedby={error ? "reset-error" : undefined}
                   className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 focus:border-orange-500"
                 />
               </div>
 
               {error && (
-                <p className="text-red-400 text-sm text-center bg-red-900/30 py-2 px-3 rounded-lg">
+                <p id="reset-error" role="alert" className="text-red-400 text-sm text-center bg-red-900/30 py-2 px-3 rounded-lg">
                   {error}
                 </p>
               )}

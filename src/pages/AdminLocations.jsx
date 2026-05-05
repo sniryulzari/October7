@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Location } from '@/api/entities';
 import { useAuth } from '@/api/AuthContext';
 import { sanitizeError } from '@/utils/sanitizeError';
@@ -153,7 +153,7 @@ export default function ManageLocations() {
                     <TableCell>
                       <div className="flex items-center gap-0.5">
                         {/* View */}
-                        <Link to={createPageUrl(`Location?id=${loc.id}`)} target="_blank">
+                        <Link to={createPageUrl(`Location?id=${loc.id}`)} target="_blank" rel="noopener noreferrer">
                           <IconBtn className="hover:text-blue-500 hover:bg-blue-50">
                             <Eye className="w-4 h-4" />
                           </IconBtn>

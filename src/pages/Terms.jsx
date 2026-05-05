@@ -1,4 +1,3 @@
-import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FileText, AlertCircle, Copyright, Ban, Globe, Scale, Mail } from 'lucide-react';
 import { Link } from 'react-router-dom';

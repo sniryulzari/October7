@@ -71,6 +71,10 @@ export const Location = {
     if (error) throw error;
   },
 
+  incrementViewCountSilent(id) {
+    return this.incrementViewCount(id).catch(() => {});
+  },
+
   async updateAudioStats(id, listeningTime, audioDuration) {
     const { error } = await supabase.rpc('update_audio_stats', {
       location_id: id,
@@ -194,7 +198,8 @@ export const User = {
   },
 
   async invite(email, fullName, role) {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) throw sessionError || new Error('Not authenticated');
     const res = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-user-action`,
       {
@@ -212,7 +217,8 @@ export const User = {
   },
 
   async deleteUser(userId) {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !session) throw sessionError || new Error('Not authenticated');
     const res = await fetch(
       `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-user-action`,
       {

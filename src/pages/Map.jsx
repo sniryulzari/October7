@@ -1,9 +1,10 @@
 
 import { useState, useEffect, useRef } from "react";
+import { useMapLibre } from "@/hooks/useMapLibre";
 import { Location } from "@/api/entities";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Search, MapPin, X, Headphones, Navigation2, AlertCircle, ArrowUpDown } from "lucide-react";
 import { createPageUrl } from "@/utils";
 
@@ -66,7 +67,7 @@ function makeInfoContent(location, color, category, dist) {
     <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 280px; min-width: 220px;">
       ${imgUrl ? `
         <div style="margin: -8px -8px 10px; overflow: hidden; height: 130px; border-radius: 8px 8px 0 0;">
-          <img src="${imgUrl}" alt="" style="width:100%;height:130px;object-fit:cover;" loading="lazy" />
+          <img src="${imgUrl}" alt="${safeText(location.name)}" style="width:100%;height:130px;object-fit:cover;" loading="lazy" />
         </div>` : ''}
       <h3 style="margin:0 0 6px;font-size:17px;font-weight:700;color:#1A1A1A;">${safeText(location.name)}</h3>
       <span style="background:${color};color:white;padding:2px 10px;border-radius:10px;font-size:12px;">${safeText(category)}</span>
@@ -79,7 +80,7 @@ function makeInfoContent(location, color, category, dist) {
            style="flex:1;background:#1D4E8F;color:white;padding:8px;text-decoration:none;border-radius:6px;font-size:13px;text-align:center;display:block;">
           פרטים מלאים
         </a>
-        <a href="${navUrl}" target="_blank" rel="noopener"
+        <a href="${navUrl}" target="_blank" rel="noopener noreferrer"
            style="background:#f0f4ff;color:#1D4E8F;padding:8px 12px;text-decoration:none;border-radius:6px;font-size:13px;text-align:center;display:block;border:1px solid #c5d5f0;">
           🧭 נווט
         </a>
@@ -105,32 +106,11 @@ export default function Map() {
   const [sortByDistance, setSortByDistance]         = useState(false);
   const [isLoading, setIsLoading]                   = useState(true);
   const [error, setError]                           = useState(null);
-  const [scriptLoaded, setScriptLoaded]             = useState(false);
+  const scriptLoaded = useMapLibre();
   const [mapReady, setMapReady]                     = useState(false);
 
   useEffect(() => { userLocationRef.current = userLocation; }, [userLocation]);
   useEffect(() => { setSelectedIdRef.current = setSelectedId; }, []);
-
-  // ── Load MapLibre GL JS ────────────────────────────────────────────────────
-  useEffect(() => {
-    if (window.maplibregl) { setScriptLoaded(true); return; }
-
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
-    document.head.appendChild(link);
-
-    const s = document.createElement('script');
-    s.src = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
-    s.onload = () => {
-      window.maplibregl.setRTLTextPlugin(
-        'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js',
-        false
-      );
-      setScriptLoaded(true);
-    };
-    document.head.appendChild(s);
-  }, []);
 
   // ── Initialize map after script loads ─────────────────────────────────────
   useEffect(() => {
@@ -394,15 +374,17 @@ export default function Map() {
               <Button
                 variant="outline" size="icon"
                 onClick={centerOnUser}
+                aria-label="מצא אותי"
                 title="מצא אותי"
                 className="shrink-0 h-11 w-11 text-[#1D4E8F] border-[#1D4E8F] hover:bg-[#EDE9E3]"
               >
-                <Navigation2 className="w-5 h-5" />
+                <Navigation2 className="w-5 h-5" aria-hidden="true" />
               </Button>
               {userLocation && (
                 <Button
                   variant="outline" size="icon"
                   onClick={() => setSortByDistance(v => !v)}
+                  aria-label={sortByDistance ? "בטל מיון לפי מרחק" : "מיין לפי מרחק"}
                   title="מיין לפי מרחק"
                   className={`shrink-0 h-11 w-11 ${sortByDistance
                     ? "bg-[#1D4E8F] text-white border-[#1D4E8F] hover:bg-[#1D4E8F]"
@@ -470,9 +452,9 @@ export default function Map() {
           <div className="lg:col-span-1 order-2 lg:order-1">
             <Card className="bg-white border-0 shadow-sm">
               <CardHeader className="pb-2 pt-4 px-4">
-                <CardTitle className="text-base text-[#1A1A1A]">
+                <h2 className="text-base font-semibold text-[#1A1A1A]">
                   מקומות ({filteredLocations.length})
-                </CardTitle>
+                </h2>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="max-h-96 lg:max-h-[648px] overflow-y-auto">

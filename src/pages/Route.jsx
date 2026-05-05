@@ -1,12 +1,15 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useMapLibre } from "@/hooks/useMapLibre";
 import { Location } from "@/api/entities";
 import { useLanguage } from "@/utils/language";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Route, MapPin, Clock, Navigation, Navigation2, Car, Info, X, Loader2, CheckCircle2, Circle, Plus, RotateCcw, ChevronDown, ChevronUp } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Card } from "@/components/ui/card";
+import { Route, MapPin, Clock, Navigation, Navigation2, Car, Loader2, CheckCircle2, RotateCcw } from "lucide-react";
 import { createPageUrl } from "@/utils";
+import { haversineKm, makeGoogleMapsNavUrl, makeGoogleMapsRouteUrl } from "@/utils/geo";
+import RouteModeSelector from "@/components/route/RouteModeSelector";
+import RouteStopCard from "@/components/route/RouteStopCard";
+import RouteNotIncluded from "@/components/route/RouteNotIncluded";
 
 const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_API_KEY;
 
@@ -18,16 +21,6 @@ let routeCacheTimestamp = null;
 const ROUTE_CACHE_DURATION = 5 * 60 * 1000;
 
 // ── Geo helpers ────────────────────────────────────────────────────────────────
-
-function haversine(lat1, lng1, lat2, lng2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 function inGazaEnvelope(lat, lng) {
   return lat >= GAZA_ENVELOPE.south && lat <= GAZA_ENVELOPE.north &&
@@ -45,7 +38,7 @@ function nearestNeighbor(locations, startPoint) {
     let bestIdx = 0, bestDist = Infinity;
     remaining.forEach((loc, i) => {
       if (!loc.coordinates) return;
-      const d = haversine(current.lat, current.lng, loc.coordinates.lat, loc.coordinates.lng);
+      const d = haversineKm(current.lat, current.lng, loc.coordinates.lat, loc.coordinates.lng);
       if (d < bestDist) { bestDist = d; bestIdx = i; }
     });
     const next = remaining[bestIdx];
@@ -66,8 +59,8 @@ function twoOpt(route) {
       for (let j = i + 2; j < best.length; j++) {
         const ci = best[i].coordinates, ci1 = best[i + 1].coordinates;
         const cj = best[j].coordinates, cj1 = j + 1 < best.length ? best[j + 1].coordinates : null;
-        const before = haversine(ci.lat, ci.lng, ci1.lat, ci1.lng) + (cj1 ? haversine(cj.lat, cj.lng, cj1.lat, cj1.lng) : 0);
-        const after  = haversine(ci.lat, ci.lng, cj.lat, cj.lng)   + (cj1 ? haversine(ci1.lat, ci1.lng, cj1.lat, cj1.lng) : 0);
+        const before = haversineKm(ci.lat, ci.lng, ci1.lat, ci1.lng) + (cj1 ? haversineKm(cj.lat, cj.lng, cj1.lat, cj1.lng) : 0);
+        const after  = haversineKm(ci.lat, ci.lng, cj.lat, cj.lng)   + (cj1 ? haversineKm(ci1.lat, ci1.lng, cj1.lat, cj1.lng) : 0);
         if (after < before - 0.001) {
           best = [...best.slice(0, i + 1), ...best.slice(i + 1, j + 1).reverse(), ...best.slice(j + 1)];
           improved = true;
@@ -123,10 +116,9 @@ function selectLocations(locations, mode, hoursBudget, startPoint) {
 
       remaining.forEach((loc, i) => {
         if (usedTime + getRecommendedTime(loc) > budgetMinutes) return;
-        // Distance to nearest stop already in the route (or start point)
         const minDist = base.length > 0
-          ? Math.min(...base.map(b => haversine(b.coordinates.lat, b.coordinates.lng, loc.coordinates.lat, loc.coordinates.lng)))
-          : haversine(startPoint.lat, startPoint.lng, loc.coordinates.lat, loc.coordinates.lng);
+          ? Math.min(...base.map(b => haversineKm(b.coordinates.lat, b.coordinates.lng, loc.coordinates.lat, loc.coordinates.lng)))
+          : haversineKm(startPoint.lat, startPoint.lng, loc.coordinates.lat, loc.coordinates.lng);
         if (minDist < bestDist) { bestDist = minDist; bestIdx = i; }
       });
 
@@ -173,14 +165,14 @@ function safeImageUrl(url) {
 }
 
 function makePopupHTML(location, index, recommendedTime) {
-  const navUrl    = `https://www.google.com/maps/dir/?api=1&destination=${location.coordinates.lat},${location.coordinates.lng}&travelmode=driving`;
+  const navUrl    = makeGoogleMapsNavUrl(location.coordinates.lat, location.coordinates.lng);
   const detailUrl = createPageUrl(`Location?id=${location.id}`);
   const imgUrl = safeImageUrl(location.main_image);
   return `
     <div dir="rtl" style="font-family:Arial,sans-serif;max-width:280px;min-width:220px;">
       ${imgUrl ? `
         <div style="margin:-8px -8px 10px;overflow:hidden;height:130px;border-radius:8px 8px 0 0;">
-          <img src="${imgUrl}" style="width:100%;height:130px;object-fit:cover;" loading="lazy" />
+          <img src="${imgUrl}" alt="${safeText(location.name)}" style="width:100%;height:130px;object-fit:cover;" loading="lazy" />
         </div>` : ''}
       <div style="font-size:12px;color:#888;margin-bottom:4px;">תחנה ${index + 1}</div>
       <h3 style="margin:0 0 6px;font-size:16px;font-weight:700;color:#1A1A1A;">${safeText(location.name)}</h3>
@@ -193,7 +185,7 @@ function makePopupHTML(location, index, recommendedTime) {
            style="flex:1;background:#1D4E8F;color:white;padding:8px;text-decoration:none;border-radius:6px;font-size:13px;text-align:center;display:block;">
           פרטים מלאים
         </a>
-        <a href="${navUrl}" target="_blank" rel="noopener"
+        <a href="${navUrl}" target="_blank" rel="noopener noreferrer"
            style="background:#f0f4ff;color:#1D4E8F;padding:8px 12px;text-decoration:none;border-radius:6px;font-size:13px;text-align:center;display:block;border:1px solid #c5d5f0;">
           🧭 נווט
         </a>
@@ -222,34 +214,14 @@ export default function RoutePage() {
   const [visitedLocations, setVisitedLocations] = useState(() => {
     try { return JSON.parse(localStorage.getItem('visitedLocations') || '[]'); } catch { return []; }
   });
-  const [showNotInRoute, setShowNotInRoute] = useState(false);
 
   // Map
   const mapDivRef  = useRef(null);
   const mapRef     = useRef(null);
   const popupRef   = useRef(null);
   const markersRef = useRef({});
-  const [scriptLoaded, setScriptLoaded] = useState(false);
-  const [mapReady, setMapReady]         = useState(false);
-
-  // ── Load MapLibre ────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (window.maplibregl) { setScriptLoaded(true); return; }
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
-    document.head.appendChild(link);
-    const s = document.createElement('script');
-    s.src = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
-    s.onload = () => {
-      window.maplibregl.setRTLTextPlugin(
-        'https://unpkg.com/@mapbox/mapbox-gl-rtl-text@0.2.3/mapbox-gl-rtl-text.min.js',
-        false
-      );
-      setScriptLoaded(true);
-    };
-    document.head.appendChild(s);
-  }, []);
+  const scriptLoaded = useMapLibre();
+  const [mapReady, setMapReady] = useState(false);
 
   // ── Initialize map ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -399,14 +371,9 @@ export default function RoutePage() {
   const startNavigation = () => {
     const stops = routeLocations.filter(l => l.coordinates);
     if (stops.length === 0) return;
-    const origin      = locationPermission === 'granted'
+    const origin = locationPermission === 'granted'
       ? `${userLocation.lat},${userLocation.lng}` : `${SDEROT.lat},${SDEROT.lng}`;
-    const destination = stops[stops.length - 1];
-    const waypoints   = stops.slice(0, -1).slice(0, 8).map(l => `${l.coordinates.lat},${l.coordinates.lng}`).join('|');
-    window.open(
-      `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination.coordinates.lat},${destination.coordinates.lng}${waypoints ? `&waypoints=${waypoints}` : ''}&travelmode=driving`,
-      '_blank'
-    );
+    window.open(makeGoogleMapsRouteUrl(origin, stops), '_blank');
   };
 
   // ── Map rendering ─────────────────────────────────────────────────────────────
@@ -487,10 +454,10 @@ export default function RoutePage() {
   const totalDistance = routeLocations.reduce((sum, l, i) => {
     if (!l.coordinates) return sum;
     const prev = i === 0 ? userLocation : routeLocations[i - 1]?.coordinates;
-    return prev ? sum + haversine(prev.lat, prev.lng, l.coordinates.lat, l.coordinates.lng) : sum;
+    return prev ? sum + haversineKm(prev.lat, prev.lng, l.coordinates.lat, l.coordinates.lng) : sum;
   }, 0);
-  const visitedCount  = routeLocations.filter(l => visitedLocations.includes(l.id)).length;
-  const notInRoute    = allLocations.filter(l => !routeLocations.find(r => r.id === l.id));
+  const visitedCount = routeLocations.filter(l => visitedLocations.includes(l.id)).length;
+  const notInRoute   = allLocations.filter(l => !routeLocations.find(r => r.id === l.id));
 
   // ── Loading ───────────────────────────────────────────────────────────────────
 
@@ -572,62 +539,13 @@ export default function RoutePage() {
             </div>
           </div>
 
-          {/* ── Route mode selector ── */}
-          {allLocations.length > 0 && (
-            <div className="mt-6 pt-5 border-t border-[#EBEBEB]">
-              <p className="text-sm font-medium text-[#1A1A1A] mb-3">{t('route.mode.label')}</p>
-              <div className="flex flex-wrap gap-2 items-center">
-                {[
-                  { id: 'essential',   labelKey: 'route.mode.essential',   descKey: 'route.mode.essentialDesc',   dot: 'bg-red-500'   },
-                  { id: 'recommended', labelKey: 'route.mode.recommended', descKey: 'route.mode.recommendedDesc', dot: 'bg-[#1D4E8F]' },
-                  { id: 'full',        labelKey: 'route.mode.full',        descKey: 'route.mode.fullDesc',        dot: 'bg-[#6B7280]' },
-                  { id: 'custom',      labelKey: 'route.mode.custom',      descKey: null,                         dot: 'bg-amber-500' },
-                ].map(({ id, labelKey, descKey, dot }) => {
-                  const active = routeMode === id;
-                  return (
-                    <button key={id} onClick={() => applyMode(id)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
-                        active ? 'bg-[#1D4E8F] text-white border-[#1D4E8F]'
-                               : 'bg-white text-[#444] border-[#D0D5DD] hover:border-[#1D4E8F] hover:text-[#1D4E8F]'
-                      }`}>
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${active ? 'bg-white' : dot}`} />
-                      {t(labelKey)}
-                      {descKey && <span className={`text-xs ${active ? 'text-blue-200' : 'text-[#555E6D]'}`}> — {t(descKey)}</span>}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Time budget slider */}
-              {routeMode === 'custom' && (
-                <div className="mt-4 max-w-sm">
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-[#555E6D]">{t('route.mode.budgetLabel')}</span>
-                    <span className="font-semibold text-[#1D4E8F]">{hoursBudget} {t('route.mode.hours')}</span>
-                  </div>
-                  <input type="range" min={2} max={9} step={0.5} value={hoursBudget}
-                    onChange={e => applyMode('custom', parseFloat(e.target.value))}
-                    className="w-full accent-[#1D4E8F] cursor-pointer" />
-                  <div className="flex justify-between text-xs text-[#555E6D] mt-1">
-                    <span>2 {t('route.mode.hours')}</span>
-                    <span>9 {t('route.mode.hours')}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* No essential locations hint */}
-              {routeMode === 'essential' && !allLocations.some(l => l.priority === 'essential') && (
-                <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 max-w-lg">
-                  💡 {t('route.mode.noPriorityHint')}
-                </p>
-              )}
-
-              {/* Customization hint */}
-              <p className="mt-3 text-xs text-[#555E6D]">
-                {t('route.customizeHint')}
-              </p>
-            </div>
-          )}
+          <RouteModeSelector
+            allLocations={allLocations}
+            routeMode={routeMode}
+            hoursBudget={hoursBudget}
+            onApplyMode={applyMode}
+            t={t}
+          />
 
           {/* Progress bar */}
           {routeLocations.length > 0 && visitedCount > 0 && (
@@ -665,142 +583,37 @@ export default function RoutePage() {
             {routeLocations.map((location, index) => {
               const prev = index === 0 ? userLocation : routeLocations[index - 1]?.coordinates;
               const distFromPrev  = prev && location.coordinates
-                ? haversine(prev.lat, prev.lng, location.coordinates.lat, location.coordinates.lng) : 0;
+                ? haversineKm(prev.lat, prev.lng, location.coordinates.lat, location.coordinates.lng) : 0;
               const driveMinutes  = Math.ceil(distFromPrev / 50 * 60);
               const recommendedTime = getRecommendedTime(location);
               const isVisited     = visitedLocations.includes(location.id);
 
               return (
-                <React.Fragment key={location.id}>
-                  {index > 0 && distFromPrev > 0 && (
-                    <div className="flex items-center gap-2 px-3 py-0.5">
-                      <div className="w-px h-4 bg-[#D0D5DD] mx-[19px]" />
-                      <span className="text-xs text-[#555E6D]">
-                        <Car className="w-3 h-3 inline ml-1" />
-                        {Math.round(distFromPrev)} {t('route.km')} — {driveMinutes} {t('route.minutes')} נסיעה
-                      </span>
-                    </div>
-                  )}
-
-                  <Card className={`bg-white hover:shadow-md transition-shadow overflow-hidden ${isVisited ? 'border-2 border-green-400' : 'border-0 shadow-sm'}`}>
-                    <CardContent className="p-4">
-                      <div className="flex gap-4">
-                        {/* Number */}
-                        <div className="flex-shrink-0">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-sm ${isVisited ? 'bg-green-500' : 'bg-[#1D4E8F]'}`}>
-                            {isVisited ? <CheckCircle2 className="w-5 h-5" /> : index + 1}
-                          </div>
-                        </div>
-
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <Link to={createPageUrl(`Location?id=${location.id}`)}
-                              onClick={() => incrementViewCount(location.id)}
-                              className="flex-1 hover:text-[#2560B0] transition-colors">
-                              <h3 className="text-base font-semibold text-[#1A1A1A] leading-tight">{locName(location)}</h3>
-                            </Link>
-                            <div className="flex items-center gap-0.5 flex-shrink-0">
-                              <Button variant="ghost" size="sm" onClick={() => toggleVisited(location.id)}
-                                title={t('route.markVisited')}
-                                className={`p-1 h-auto ${isVisited ? 'text-green-600' : 'text-[#555E6D] hover:text-green-600'}`}>
-                                {isVisited ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => removeFromRoute(location.id)}
-                                className="p-1 h-auto text-[#555E6D] hover:text-red-500">
-                                <X className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-
-                          <p className="text-sm text-[#555E6D] mb-2 leading-relaxed line-clamp-2">
-                            {locStoryTitle(location) || t('route.defaultStory')}
-                          </p>
-
-                          <div className="flex flex-wrap items-center gap-2 mb-3">
-                            <Badge variant="outline" className="text-xs border-[#1D4E8F] text-[#1D4E8F] px-2">
-                              {location.category}
-                            </Badge>
-                            <span className="text-xs text-[#1D4E8F] font-medium">⏱ {recommendedTime} {t('route.minutes')}</span>
-                            {location.audio_file && <span className="text-xs text-purple-600">🎧 הקלטה</span>}
-                          </div>
-
-                          <div className="flex gap-2">
-                            <Link to={createPageUrl(`Location?id=${location.id}`)}>
-                              <Button size="sm" className="bg-[#1D4E8F] hover:bg-[#2560B0] text-white text-xs h-8">
-                                <Info className="w-3 h-3 ml-1" />{t('route.moreInfo')}
-                              </Button>
-                            </Link>
-                            {location.coordinates && (
-                              <Button size="sm" variant="outline"
-                                className="border-[#1D4E8F] text-[#1D4E8F] hover:bg-[#F2F2F2] text-xs h-8"
-                                onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${location.coordinates.lat},${location.coordinates.lng}&travelmode=driving`, '_blank')}>
-                                <Navigation className="w-3 h-3 ml-1" />{t('route.navigateTo')}
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Thumbnail */}
-                        <div className="hidden sm:block w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-[#F2F2F2]">
-                          {location.main_image
-                            ? <Link to={createPageUrl(`Location?id=${location.id}`)} onClick={() => incrementViewCount(location.id)}>
-                                <img src={location.main_image} alt={location.name} className="w-full h-full object-cover hover:opacity-80 transition-opacity" loading="lazy" />
-                              </Link>
-                            : <div className="w-full h-full flex items-center justify-center"><MapPin className="w-6 h-6 text-[#555E6D]" /></div>
-                          }
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </React.Fragment>
+                <RouteStopCard
+                  key={location.id}
+                  location={location}
+                  index={index}
+                  distFromPrev={distFromPrev}
+                  driveMinutes={driveMinutes}
+                  recommendedTime={recommendedTime}
+                  isVisited={isVisited}
+                  locName={locName}
+                  locStoryTitle={locStoryTitle}
+                  onToggleVisited={toggleVisited}
+                  onRemove={removeFromRoute}
+                  onIncrementViewCount={incrementViewCount}
+                  t={t}
+                />
               );
             })}
 
-            {/* ── Not in route — add back section ── */}
-            {notInRoute.length > 0 && (
-              <div className="mt-6">
-                <button
-                  onClick={() => setShowNotInRoute(v => !v)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-dashed border-[#D0D5DD] hover:border-[#1D4E8F] text-sm text-[#555E6D] hover:text-[#1D4E8F] transition-colors"
-                >
-                  <span className="flex items-center gap-2">
-                    <Plus className="w-4 h-4" />
-                    {t('route.notInRoute')} ({notInRoute.length})
-                  </span>
-                  {showNotInRoute ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </button>
-
-                {showNotInRoute && (
-                  <div className="mt-2 space-y-2">
-                    <p className="text-xs text-[#555E6D] px-1 pb-1">{t('route.notInRouteHint')}</p>
-                    {notInRoute.map(location => (
-                      <Card key={location.id} className="bg-white border-0 shadow-sm opacity-80 hover:opacity-100 transition-opacity">
-                        <CardContent className="p-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-[#F2F2F2]">
-                              {location.main_image
-                                ? <img src={location.main_image} alt={location.name} className="w-full h-full object-cover" loading="lazy" />
-                                : <div className="w-full h-full flex items-center justify-center"><MapPin className="w-4 h-4 text-[#555E6D]" /></div>
-                              }
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-[#1A1A1A] truncate">{locName(location)}</p>
-                              <p className="text-xs text-[#555E6D] truncate">{locStoryTitle(location) || location.category}</p>
-                            </div>
-                            <Button size="sm" onClick={() => addToRoute(location)}
-                              className="bg-[#1D4E8F] hover:bg-[#2560B0] text-white text-xs h-8 shrink-0 gap-1">
-                              <Plus className="w-3 h-3" />
-                              {t('route.addToRoute')}
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            <RouteNotIncluded
+              locations={notInRoute}
+              locName={locName}
+              locStoryTitle={locStoryTitle}
+              onAdd={addToRoute}
+              t={t}
+            />
           </div>
 
           {/* Sticky map */}
