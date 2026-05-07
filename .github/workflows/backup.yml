@@ -34,19 +34,18 @@ jobs:
 
       - name: Configure rclone
         env:
-          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+          GDRIVE_RCLONE_TOKEN: ${{ secrets.GDRIVE_RCLONE_TOKEN }}
           GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
           SUPABASE_S3_ACCESS_KEY: ${{ secrets.SUPABASE_S3_ACCESS_KEY }}
           SUPABASE_S3_SECRET_KEY: ${{ secrets.SUPABASE_S3_SECRET_KEY }}
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
           mkdir -p ~/.config/rclone
-          echo "$GDRIVE_SERVICE_ACCOUNT_JSON" > /tmp/gdrive-sa.json
           cat > ~/.config/rclone/rclone.conf << EOF
           [gdrive]
           type = drive
           scope = drive
-          service_account_file = /tmp/gdrive-sa.json
+          token = $GDRIVE_RCLONE_TOKEN
           root_folder_id = $GDRIVE_FOLDER_ID
 
           [supabase]
